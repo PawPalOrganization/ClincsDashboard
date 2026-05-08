@@ -11,11 +11,11 @@ const BRANCH_ID_KEY = 'portalBranchId';
 export type QueryParams = Record<string, string | number | boolean | undefined>;
 
 export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-  ) {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
     super(message);
+    this.status = status;
     this.name = 'ApiError';
   }
 }
