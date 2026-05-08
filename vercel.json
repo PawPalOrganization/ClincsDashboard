@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/clinic/api/:path*",
+      "destination": "https://backend-production-12d0.up.railway.app/clinic/api/:path*"
+    }
+  ]
+}
