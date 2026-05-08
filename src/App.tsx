@@ -1,0 +1,129 @@
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { ClinicAuthProvider } from './context/ClinicAuthContext';
+import { useClinicAuth } from './context/ClinicAuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import ClinicLayout from './components/layout/ClinicLayout/ClinicLayout';
+import PawLoader from './components/common/PawLoader/PawLoader';
+import Login from './pages/Login/Login';
+import ClinicDashboard from './pages/Dashboard/ClinicDashboard';
+import ClinicSettings from './pages/Settings/ClinicSettings';
+import BranchesList from './pages/Branches/BranchesList';
+import CreateBranch from './pages/Branches/CreateBranch';
+import EditBranch from './pages/Branches/EditBranch';
+
+// ─── Root redirect ─────────────────────────────────────────────────────────
+// Reads auth state and sends the user to the right place.
+// Shows the loader while localStorage is being hydrated (isLoading: true).
+
+function RootRedirect() {
+  const { isAuthenticated, isLoading } = useClinicAuth();
+
+  if (isLoading) {
+    return <PawLoader size="large" overlay />;
+  }
+
+  return (
+    <Navigate
+      to={isAuthenticated ? '/dashboard' : '/login'}
+      replace
+    />
+  );
+}
+
+// ─── Placeholder ────────────────────────────────────────────────────────────
+// Temporary stand-in rendered for pages not yet built.
+// Replace each route's element with the real page component when ready.
+
+function PlaceholderPage({ title }: { title: string }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '50vh',
+        gap: '0.75rem',
+        color: '#7f8c8d',
+        textAlign: 'center',
+      }}
+    >
+      <i className="bi bi-tools" style={{ fontSize: '3rem' }} />
+      <h2 style={{ color: '#2c3e50', margin: 0 }}>{title}</h2>
+      <p style={{ margin: 0 }}>This page is under construction.</p>
+    </div>
+  );
+}
+
+// ─── Not found ──────────────────────────────────────────────────────────────
+
+function NotFound() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        gap: '1rem',
+        textAlign: 'center',
+        padding: '2rem',
+      }}
+    >
+      <i className="bi bi-exclamation-circle" style={{ fontSize: '4rem', color: '#e74c3c' }} />
+      <h2 style={{ color: '#2c3e50', margin: 0 }}>404 — Page Not Found</h2>
+      <p style={{ color: '#7f8c8d', margin: 0 }}>
+        The page you are looking for does not exist.
+      </p>
+      <Link
+        to="/dashboard"
+        style={{
+          color: '#0d9aff',
+          textDecoration: 'none',
+          fontWeight: 600,
+          marginTop: '0.5rem',
+        }}
+      >
+        ← Back to Dashboard
+      </Link>
+    </div>
+  );
+}
+
+// ─── App ────────────────────────────────────────────────────────────────────
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <ClinicAuthProvider>
+        <Routes>
+
+          {/* Root redirect — smart: checks auth before deciding destination */}
+          <Route path="/" element={<RootRedirect />} />
+
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+
+          {/* Protected routes — guarded by ProtectedRoute, wrapped by ClinicLayout */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<ClinicLayout />}>
+              <Route path="/dashboard"           element={<ClinicDashboard />} />
+              <Route path="/branches"            element={<BranchesList />} />
+              <Route path="/branches/create"     element={<CreateBranch />} />
+              <Route path="/branches/:branchId"  element={<EditBranch />} />
+              <Route path="/staff"               element={<PlaceholderPage title="Staff" />} />
+              <Route path="/staff/create"        element={<PlaceholderPage title="Create Staff Member" />} />
+              <Route path="/staff/:staffId"      element={<PlaceholderPage title="Staff Member" />} />
+              <Route path="/settings"            element={<ClinicSettings />} />
+            </Route>
+          </Route>
+
+          {/* Fallback — catches all unmatched paths */}
+          <Route path="*" element={<NotFound />} />
+
+        </Routes>
+      </ClinicAuthProvider>
+    </BrowserRouter>
+  );
+}

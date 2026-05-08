@@ -1,0 +1,73 @@
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import './variables.css';
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-text-light);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Utility Classes */
+.text-primary-custom {
+  color: var(--color-primary) !important;
+}
+
+.bg-primary-custom {
+  background-color: var(--color-primary) !important;
+}
+
+.btn-primary-custom {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.btn-primary-custom:hover {
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+
+.shadow-custom-sm {
+  box-shadow: var(--shadow-sm);
+}
+
+.shadow-custom-md {
+  box-shadow: var(--shadow-md);
+}
+
+.shadow-custom-lg {
+  box-shadow: var(--shadow-lg);
+}

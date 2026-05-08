@@ -1,0 +1,207 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useClinicAuth } from '../../context/ClinicAuthContext';
+import clinicBranchesService from '../../services/clinic/clinicBranchesService';
+import type { ClinicBranch } from '../../types/clinic.types';
+import type { Column } from '../../components/common/DataTable/DataTable';
+import DataTable from '../../components/common/DataTable/DataTable';
+import Button from '../../components/common/Button/Button';
+import PageHeaderSkeleton from '../../components/common/Skeleton/PageHeaderSkeleton';
+import TablePageSkeleton from '../../components/common/Skeleton/TablePageSkeleton';
+import styles from './Branches.module.scss';
+
+type BranchRow = ClinicBranch & Record<string, unknown>;
+
+const LIMIT = 10;
+
+export default function BranchesList() {
+  const { clinicId } = useClinicAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const successMsg = (location.state as { successMsg?: string } | null)?.successMsg ?? '';
+
+  const [branches, setBranches]       = useState<BranchRow[]>([]);
+  const [total, setTotal]             = useState(0);
+  const [page, setPage]               = useState(1);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [loading, setLoading]         = useState(true);
+  const [hasLoaded, setHasLoaded]     = useState(false);
+  const [error, setError]             = useState('');
+
+  const fetchBranches = useCallback(async (targetPage: number) => {
+    if (!clinicId) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await clinicBranchesService.list(clinicId, targetPage, LIMIT);
+      setBranches(result.items as BranchRow[]);
+      setTotal(result.meta.total);
+      setPage(result.meta.page);
+      setTotalPages(result.meta.totalPages);
+      setHasLoaded(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load branches.');
+    } finally {
+      setLoading(false);
+    }
+  }, [clinicId]);
+
+  useEffect(() => {
+    fetchBranches(1);
+  }, [fetchBranches]);
+
+  const columns: Column<BranchRow>[] = [
+    {
+      key: 'title',
+      label: 'Branch Name',
+      width: '200px',
+      render: (row) => (
+        <div className={styles.branchName}>
+          <span className={styles.nameText}>{row.title}</span>
+          {row.isMainBranch && (
+            <span className={styles.mainBadge}>Main</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'phoneNumber',
+      label: 'Phone',
+      width: '150px',
+      render: (row) =>
+        row.phoneNumber ? (
+          <span className={styles.cellText}>
+            <i className="bi bi-telephone" /> {row.phoneNumber}
+          </span>
+        ) : (
+          <span className={styles.noData}>—</span>
+        ),
+    },
+    {
+      key: 'address',
+      label: 'Address',
+      render: (row) =>
+        row.address ? (
+          <span className={styles.addressText} title={row.address}>
+            <i className="bi bi-geo-alt" /> {row.address}
+          </span>
+        ) : (
+          <span className={styles.noData}>—</span>
+        ),
+    },
+    {
+      key: 'serviceIds',
+      label: 'Services',
+      width: '90px',
+      render: (row) => (
+        <span className={styles.countBadge}>
+          <i className="bi bi-grid" /> {row.serviceIds?.length ?? 0}
+        </span>
+      ),
+    },
+    {
+      key: 'workingHours',
+      label: 'Days Open',
+      width: '100px',
+      render: (row) => {
+        const count = row.workingHours?.length ?? 0;
+        return count > 0 ? (
+          <span className={styles.countBadge}>
+            <i className="bi bi-clock" /> {count} day{count !== 1 ? 's' : ''}
+          </span>
+        ) : (
+          <span className={styles.noData}>—</span>
+        );
+      },
+    },
+    {
+      key: 'tags',
+      label: 'Tags',
+      width: '180px',
+      render: (row) =>
+        row.tags && row.tags.length > 0 ? (
+          <div className={styles.tagList}>
+            {row.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className={styles.tag}>{tag}</span>
+            ))}
+            {row.tags.length > 3 && (
+              <span className={styles.tagMore}>+{row.tags.length - 3}</span>
+            )}
+          </div>
+        ) : (
+          <span className={styles.noData}>—</span>
+        ),
+    },
+  ];
+
+  if (!clinicId) {
+    return (
+      <div className={styles.noClinic}>
+        <i className="bi bi-exclamation-circle" />
+        <p>No clinic is assigned to your account. Contact your administrator.</p>
+      </div>
+    );
+  }
+
+  const isInitialLoad = loading && !hasLoaded;
+
+  return (
+    <div className={styles.page}>
+
+      {/* ── Page header ── */}
+      {isInitialLoad ? (
+        <PageHeaderSkeleton />
+      ) : (
+        <div className={styles.pageHeader}>
+          <div>
+            <h1 className={styles.pageTitle}>Branches</h1>
+            <p className={styles.pageSubtitle}>
+              {total > 0
+                ? `${total} branch${total !== 1 ? 'es' : ''} in your clinic`
+                : 'Manage your clinic branches'}
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            icon="bi-plus-lg"
+            onClick={() => navigate('/branches/create')}
+          >
+            New Branch
+          </Button>
+        </div>
+      )}
+
+      {/* ── Success banner (from create / edit navigation) ── */}
+      {successMsg && (
+        <div className={`alert alert-success py-2 ${styles.errorAlert}`} role="alert">
+          <i className="bi bi-check-circle-fill" /> {successMsg}
+        </div>
+      )}
+
+      {/* ── Error banner ── */}
+      {error && (
+        <div className={`alert alert-danger py-2 ${styles.errorAlert}`} role="alert">
+          <i className="bi bi-exclamation-circle-fill" /> {error}
+        </div>
+      )}
+
+      {/* ── Table / skeleton ── */}
+      {isInitialLoad ? (
+        <TablePageSkeleton columns={6} rows={6} />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={branches}
+          loading={loading}
+          currentPage={page}
+          totalPages={totalPages}
+          totalItems={total}
+          onPageChange={(p) => fetchBranches(p)}
+          onEdit={(row) => navigate(`/branches/${row.id}`)}
+          emptyMessage="No branches found. Create your first branch to get started."
+        />
+      )}
+
+    </div>
+  );
+}

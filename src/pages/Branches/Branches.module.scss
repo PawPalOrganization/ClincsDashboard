@@ -1,0 +1,444 @@
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+// ─── Page header ──────────────────────────────────────────────────────────────
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.pageTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a1d2e;
+  margin: 0 0 0.2rem;
+}
+
+.pageSubtitle {
+  font-size: 0.825rem;
+  color: #9ba3af;
+  margin: 0;
+}
+
+// ─── Error alert ──────────────────────────────────────────────────────────────
+
+.errorAlert {
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+// ─── Branch name cell ─────────────────────────────────────────────────────────
+
+.branchName {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.nameText {
+  font-weight: 600;
+  color: #1a1d2e;
+  font-size: 0.875rem;
+}
+
+.mainBadge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #0d9aff;
+  background: rgba(13, 154, 255, 0.1);
+  border: 1px solid rgba(13, 154, 255, 0.2);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  white-space: nowrap;
+}
+
+// ─── Generic cell text ────────────────────────────────────────────────────────
+
+.cellText {
+  font-size: 0.875rem;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+
+  i {
+    color: #9ba3af;
+    font-size: 0.8rem;
+  }
+}
+
+.addressText {
+  font-size: 0.875rem;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  i {
+    flex-shrink: 0;
+    color: #9ba3af;
+    font-size: 0.8rem;
+  }
+}
+
+.noData {
+  color: #c4c9d4;
+  font-size: 0.875rem;
+}
+
+// ─── Count badge ──────────────────────────────────────────────────────────────
+
+.countBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: #4b5563;
+  background: #f3f4f6;
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.5rem;
+
+  i {
+    color: #9ba3af;
+    font-size: 0.75rem;
+  }
+}
+
+// ─── Tag pills ────────────────────────────────────────────────────────────────
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.tag {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  white-space: nowrap;
+}
+
+.tagMore {
+  font-size: 0.7rem;
+  color: #9ba3af;
+  padding: 0.15rem 0.25rem;
+  align-self: center;
+}
+
+// ─── No clinic state ──────────────────────────────────────────────────────────
+
+.noClinic {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 40vh;
+  text-align: center;
+  color: #9ba3af;
+
+  i {
+    font-size: 2.5rem;
+    color: #f59e0b;
+  }
+
+  p {
+    font-size: 0.875rem;
+    margin: 0;
+    max-width: 320px;
+  }
+}
+
+// ─── Form layout ──────────────────────────────────────────────────────────────
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+// ─── Card (shared by form sections) ──────────────────────────────────────────
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 1rem;
+  padding: 0 1.5rem 0.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.cardHeader {
+  padding: 1.25rem 0 1rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #f2f4f7;
+}
+
+.sectionTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1d2e;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+
+  i {
+    color: #0d9aff;
+    font-size: 0.875rem;
+  }
+}
+
+.sectionDesc {
+  font-size: 0.8rem;
+  color: #9ba3af;
+  margin: 0.3rem 0 0;
+}
+
+// ─── Field ────────────────────────────────────────────────────────────────────
+
+.field {
+  margin-bottom: 1rem;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6c757d;
+  margin-bottom: 0.5rem;
+}
+
+.fieldHint {
+  font-size: 0.775rem;
+  color: #9ba3af;
+  margin: 0.35rem 0 0;
+
+  i {
+    font-size: 0.75rem;
+  }
+}
+
+// ─── Text inputs ──────────────────────────────────────────────────────────────
+
+.textInput,
+.textarea {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-family: inherit;
+  color: inherit;
+  background-color: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0d9aff;
+    box-shadow: 0 0 0 3px rgba(13, 154, 255, 0.1);
+  }
+
+  &:disabled {
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  &::placeholder {
+    opacity: 0.5;
+  }
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+// ─── Two-column grid ──────────────────────────────────────────────────────────
+
+.twoCol {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// ─── Logo preview ─────────────────────────────────────────────────────────────
+
+.previewBox {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e4e4e4;
+  border-radius: 0.625rem;
+  background: #f9f9f9;
+  overflow: hidden;
+}
+
+.logoImg {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  display: block;
+  padding: 0.375rem;
+}
+
+// ─── Toggles ──────────────────────────────────────────────────────────────────
+
+.togglesRow {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  cursor: pointer;
+  user-select: none;
+
+  input[type='checkbox'] {
+    margin-top: 0.15rem;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    accent-color: #0d9aff;
+    cursor: pointer;
+  }
+}
+
+.toggleLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+
+  strong {
+    font-size: 0.875rem;
+    color: #1a1d2e;
+    font-weight: 600;
+  }
+
+  span {
+    font-size: 0.775rem;
+    color: #9ba3af;
+  }
+}
+
+// ─── Working hours ────────────────────────────────────────────────────────────
+
+.hoursTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.dayRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  transition: background 0.15s ease;
+}
+
+.dayRowActive {
+  background: rgba(13, 154, 255, 0.04);
+  border-color: rgba(13, 154, 255, 0.12);
+}
+
+.dayCheck {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  min-width: 120px;
+
+  input[type='checkbox'] {
+    width: 15px;
+    height: 15px;
+    accent-color: #0d9aff;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+}
+
+.dayName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.timeInputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.timeInput {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.4rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: inherit;
+  background: #ffffff;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0d9aff;
+  }
+
+  &:disabled {
+    background: #f8f9fa;
+    opacity: 0.6;
+  }
+}
+
+.timeSep {
+  font-size: 0.8rem;
+  color: #9ba3af;
+}
+
+.dayClosed {
+  font-size: 0.8rem;
+  color: #c4c9d4;
+  font-style: italic;
+}
+
+// ─── Bottom save ──────────────────────────────────────────────────────────────
+
+.bottomSave {
+  padding-bottom: 0.5rem;
+}

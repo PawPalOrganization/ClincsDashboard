@@ -1,0 +1,185 @@
+.sidebar {
+  width: 250px;
+  height: 100vh;
+  background-color: #1a1d2e;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  transition: transform 0.3s ease;
+
+  &:not(.open) {
+    transform: translateX(-100%);
+  }
+
+  @media (min-width: 1201px) {
+    &.open {
+      box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+    }
+  }
+
+  @media (max-width: 1200px) {
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+  }
+}
+
+// ─── Close button ─────────────────────────────────────────────────────────────
+
+.closeButton {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #b8bcc8;
+  font-size: 22px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+  }
+}
+
+// ─── Logo ─────────────────────────────────────────────────────────────────────
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 1.375rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+  i {
+    font-size: 1.4rem;
+    color: #0d9aff;
+  }
+
+  span {
+    font-size: 0.975rem;
+    font-weight: 700;
+    color: white;
+    letter-spacing: 0.02em;
+  }
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+
+.nav {
+  flex: 1;
+  padding: 0.75rem 0;
+  overflow-y: auto;
+}
+
+.navList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1.25rem;
+  color: #b8bcc8;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: white;
+  }
+
+  &.active {
+    background-color: rgba(13, 154, 255, 0.1);
+    color: #0d9aff;
+    border-right: 3px solid #0d9aff;
+  }
+}
+
+.navIcon {
+  font-size: 1.05rem;
+}
+
+// ─── Bottom section ───────────────────────────────────────────────────────────
+
+.bottomSection {
+  margin-top: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.75rem;
+}
+
+.profileCard {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.7rem 0.875rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 0.625rem;
+  margin-bottom: 0.5rem;
+}
+
+.avatar {
+  i {
+    font-size: 1.75rem;
+    color: #0d9aff;
+    display: block;
+    line-height: 1;
+  }
+}
+
+.profileText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.greeting {
+  font-size: 0.68rem;
+  color: #8b8fa3;
+}
+
+.staffName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logoutButton {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.875rem;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #f87171;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-radius: 0.5rem;
+
+  i {
+    font-size: 1rem;
+  }
+
+  &:hover {
+    background: rgba(248, 113, 113, 0.08);
+    color: #fca5a5;
+  }
+}

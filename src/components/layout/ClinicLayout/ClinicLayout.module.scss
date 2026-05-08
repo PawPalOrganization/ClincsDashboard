@@ -1,0 +1,112 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  position: relative;
+}
+
+// ─── Hamburger button ─────────────────────────────────────────────────────────
+
+@keyframes hamburgerSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  50% {
+    opacity: 0.5;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes hamburgerSlideOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-20px);
+    pointer-events: none;
+  }
+}
+
+.hamburger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1001;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 8px;
+  background: #1a1d2e;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  &:hover {
+    background: #252938;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.hamburgerVisible {
+  animation: hamburgerSlideIn 0.35s ease forwards;
+}
+
+.hamburgerHidden {
+  animation: hamburgerSlideOut 0.25s ease forwards;
+  pointer-events: none;
+}
+
+// ─── Mobile overlay ───────────────────────────────────────────────────────────
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  backdrop-filter: blur(2px);
+
+  @media (min-width: 1201px) {
+    display: none;
+  }
+}
+
+// ─── Main content area ────────────────────────────────────────────────────────
+
+.mainContent {
+  flex: 1;
+  margin-left: 250px; // matches sidebar width
+  min-height: 100vh;
+  transition: margin-left 0.3s ease;
+
+  &.sidebarClosed {
+    margin-left: 0;
+  }
+
+  @media (max-width: 1200px) {
+    margin-left: 0; // sidebar overlays on smaller screens
+  }
+}
+
+.contentWrapper {
+  padding: 5rem 2rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+
+  @media (max-width: 768px) {
+    padding: 5rem 1rem 2rem;
+  }
+}
