@@ -4,6 +4,7 @@ import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import clinicStaffRolesService from '../../services/clinic/clinicStaffRolesService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
+import { hasAnyClinicPermission, hasClinicPermission } from '../../utils/clinicPermissions';
 import type {
   ClinicBranch,
   ClinicStaff,
@@ -20,9 +21,16 @@ import StaffAssignments from './StaffAssignments';
 import styles from './Staff.module.scss';
 
 export default function EditStaff() {
-  const { clinicId } = useClinicAuth();
+  const { clinicId, staff: authStaff } = useClinicAuth();
   const { staffId } = useParams<{ staffId: string }>();
   const navigate = useNavigate();
+  const canViewStaff = hasClinicPermission(authStaff, 'clinic-staff.read');
+  const canUpdateStaff = hasClinicPermission(authStaff, 'clinic-staff.update');
+  const canUpdateAssignments = hasClinicPermission(authStaff, 'clinic-staff.assignments');
+  const canOpenStaffDetails = hasAnyClinicPermission(authStaff, [
+    'clinic-staff.update',
+    'clinic-staff.assignments',
+  ]);
 
   const [staff, setStaff] = useState<ClinicStaff | null>(null);
   const [branches, setBranches] = useState<ClinicBranch[]>([]);
@@ -33,7 +41,7 @@ export default function EditStaff() {
   const [serverError, setServerError] = useState('');
 
   useEffect(() => {
-    if (!clinicId || !staffId) {
+    if (!clinicId || !staffId || !canViewStaff) {
       setLoading(false);
       return;
     }
@@ -70,7 +78,7 @@ export default function EditStaff() {
     }
 
     loadStaffPage();
-  }, [clinicId, staffId]);
+  }, [canViewStaff, clinicId, staffId]);
 
   async function handleSubmit(payload: CreateClinicStaffPayload | UpdateClinicStaffPayload) {
     if (!staffId) return;
@@ -91,6 +99,19 @@ export default function EditStaff() {
       <div className={styles.noClinic}>
         <i className="bi bi-exclamation-circle" />
         <p>No clinic or staff member was found for this page.</p>
+      </div>
+    );
+  }
+
+  if (!canViewStaff || !canOpenStaffDetails) {
+    return (
+      <div className={styles.accessDenied}>
+        <i className="bi bi-shield-lock" />
+        <h2>Staff editing is restricted</h2>
+        <p>Your current clinic role does not include permission to edit staff profiles or branch assignments.</p>
+        <Button variant="outline" icon="bi-arrow-left" onClick={() => navigate('/staff')}>
+          Back to Staff
+        </Button>
       </div>
     );
   }
@@ -145,12 +166,14 @@ export default function EditStaff() {
               roles={roles}
               saving={saving}
               serverError={serverError}
+              readOnly={!canUpdateStaff}
               onSubmit={handleSubmit}
               childrenBeforeSubmit={
                 <StaffAssignments
                   staff={staff}
                   branches={branches}
-                  disabled={saving}
+                  disabled={saving || !canUpdateAssignments}
+                  canEdit={canUpdateAssignments}
                 />
               }
             />

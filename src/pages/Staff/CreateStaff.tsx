@@ -4,6 +4,7 @@ import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import clinicStaffRolesService from '../../services/clinic/clinicStaffRolesService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
+import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type {
   ClinicBranch,
   ClinicStaffRole,
@@ -17,8 +18,9 @@ import StaffForm from './StaffForm';
 import styles from './Staff.module.scss';
 
 export default function CreateStaff() {
-  const { clinicId } = useClinicAuth();
+  const { clinicId, staff } = useClinicAuth();
   const navigate = useNavigate();
+  const canCreateStaff = hasClinicPermission(staff, 'clinic-staff.create');
 
   const [branches, setBranches] = useState<ClinicBranch[]>([]);
   const [roles, setRoles] = useState<ClinicStaffRole[]>([]);
@@ -28,7 +30,7 @@ export default function CreateStaff() {
   const [serverError, setServerError] = useState('');
 
   useEffect(() => {
-    if (!clinicId) {
+    if (!clinicId || !canCreateStaff) {
       setLoading(false);
       return;
     }
@@ -60,7 +62,7 @@ export default function CreateStaff() {
     }
 
     loadOptions();
-  }, [clinicId]);
+  }, [canCreateStaff, clinicId]);
 
   async function handleSubmit(payload: CreateClinicStaffPayload | UpdateClinicStaffPayload) {
     setSaving(true);
@@ -80,6 +82,19 @@ export default function CreateStaff() {
       <div className={styles.noClinic}>
         <i className="bi bi-exclamation-circle" />
         <p>No clinic is assigned to your account. Contact your administrator.</p>
+      </div>
+    );
+  }
+
+  if (!canCreateStaff) {
+    return (
+      <div className={styles.accessDenied}>
+        <i className="bi bi-shield-lock" />
+        <h2>Create staff is restricted</h2>
+        <p>Your current clinic role can view staff, but cannot create new staff members.</p>
+        <Button variant="outline" icon="bi-arrow-left" onClick={() => navigate('/staff')}>
+          Back to Staff
+        </Button>
       </div>
     );
   }

@@ -118,6 +118,57 @@
   font-size: 0.875rem;
 }
 
+.accessDenied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 45vh;
+  padding: 2rem;
+  text-align: center;
+  color: #9ba3af;
+
+  i {
+    font-size: 2.75rem;
+    color: #f59e0b;
+  }
+
+  h2 {
+    color: #1a1d2e;
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  p {
+    max-width: 420px;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+}
+
+.readOnlyNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid #e4e7ec;
+  border-radius: 0.625rem;
+  background: #f8fafc;
+  color: #667085;
+  font-size: 0.82rem;
+  line-height: 1.45;
+
+  i {
+    color: #0d9aff;
+    font-size: 0.95rem;
+    margin-top: 0.08rem;
+    flex-shrink: 0;
+  }
+}
+
 .form {
   display: flex;
   flex-direction: column;

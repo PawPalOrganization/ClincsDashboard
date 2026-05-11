@@ -8,6 +8,7 @@ interface StaffAssignmentsProps {
   staff: ClinicStaff;
   branches: ClinicBranch[];
   disabled?: boolean;
+  canEdit?: boolean;
 }
 
 function getInitialBranchIds(staff: ClinicStaff, branches: ClinicBranch[]): string[] {
@@ -26,6 +27,7 @@ export default function StaffAssignments({
   staff,
   branches,
   disabled = false,
+  canEdit = true,
 }: StaffAssignmentsProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
     getInitialBranchIds(staff, branches),
@@ -58,6 +60,8 @@ export default function StaffAssignments({
   }
 
   async function handleSave() {
+    if (!canEdit) return;
+
     setSaving(true);
     setSuccessMsg('');
     setErrorMsg('');
@@ -94,6 +98,13 @@ export default function StaffAssignments({
         </span>
       </div>
 
+      {!canEdit && (
+        <div className={styles.readOnlyNotice}>
+          <i className="bi bi-eye" />
+          <span>Your role can view assignments, but cannot change branch assignments.</span>
+        </div>
+      )}
+
       {successMsg && (
         <div className={`alert alert-success py-2 ${styles.feedbackAlert}`} role="alert">
           <i className="bi bi-check-circle-fill" /> {successMsg}
@@ -129,7 +140,7 @@ export default function StaffAssignments({
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleBranch(branchId)}
-                    disabled={disabled || saving}
+                    disabled={disabled || saving || !canEdit}
                   />
                   <span className={styles.assignmentText}>
                     <strong>{branch.title}</strong>
@@ -145,17 +156,19 @@ export default function StaffAssignments({
             Saving sends the full checked branch list and replaces the current assignments.
           </p>
 
-          <div className={styles.assignmentActions}>
-            <Button
-              type="button"
-              variant="primary"
-              loading={saving}
-              disabled={disabled || saving}
-              onClick={handleSave}
-            >
-              Save Assignments
-            </Button>
-          </div>
+          {canEdit && (
+            <div className={styles.assignmentActions}>
+              <Button
+                type="button"
+                variant="primary"
+                loading={saving}
+                disabled={disabled || saving}
+                onClick={handleSave}
+              >
+                Save Assignments
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>

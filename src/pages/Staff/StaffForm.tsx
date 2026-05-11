@@ -21,6 +21,7 @@ interface StaffFormProps {
   roles: ClinicStaffRole[];
   saving: boolean;
   serverError: string;
+  readOnly?: boolean;
   childrenBeforeSubmit?: ReactNode;
   onSubmit: (payload: StaffFormPayload) => Promise<void>;
 }
@@ -48,9 +49,11 @@ export default function StaffForm({
   roles,
   saving,
   serverError,
+  readOnly = false,
   childrenBeforeSubmit,
   onSubmit,
 }: StaffFormProps) {
+  const fieldDisabled = saving || readOnly;
   const [firstName, setFirstName] = useState(defaultValues?.firstName ?? '');
   const [lastName, setLastName] = useState(defaultValues?.lastName ?? '');
   const [bio, setBio] = useState(defaultValues?.bio ?? '');
@@ -164,6 +167,13 @@ export default function StaffForm({
         </div>
       )}
 
+      {readOnly && (
+        <div className={styles.readOnlyNotice}>
+          <i className="bi bi-eye" />
+          <span>Your role can view this profile, but cannot edit staff profile fields.</span>
+        </div>
+      )}
+
       <div className={styles.card}>
         <div className={styles.cardHeader}>
           <h2 className={styles.sectionTitle}>
@@ -183,7 +193,7 @@ export default function StaffForm({
             }}
             error={errors.firstName}
             required
-            disabled={saving}
+            disabled={fieldDisabled}
           />
           <Input
             label="Last Name"
@@ -195,7 +205,7 @@ export default function StaffForm({
             }}
             error={errors.lastName}
             required
-            disabled={saving}
+            disabled={fieldDisabled}
           />
         </div>
 
@@ -212,7 +222,7 @@ export default function StaffForm({
             error={errors.email}
             icon="bi-envelope"
             required
-            disabled={saving}
+            disabled={fieldDisabled}
           />
           <Input
             label={mode === 'create' ? 'Password' : 'Password'}
@@ -226,7 +236,7 @@ export default function StaffForm({
             }}
             error={errors.password}
             required={mode === 'create'}
-            disabled={saving}
+            disabled={fieldDisabled}
           />
         </div>
 
@@ -238,7 +248,7 @@ export default function StaffForm({
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setBio(e.target.value)}
             rows={3}
             placeholder="Short staff bio"
-            disabled={saving}
+            disabled={fieldDisabled}
           />
         </div>
       </div>
@@ -266,7 +276,7 @@ export default function StaffForm({
                   setClinicBranchId(e.target.value);
                   clearError('clinicBranchId');
                 }}
-                disabled={saving}
+                disabled={fieldDisabled}
                 required
               >
                 <option value="">Choose branch</option>
@@ -288,7 +298,7 @@ export default function StaffForm({
               className={styles.selectInput}
               value={roleId}
               onChange={(e) => setRoleId(e.target.value)}
-              disabled={saving}
+              disabled={fieldDisabled}
             >
               <option value="">
                 {mode === 'create' ? 'Default Clinic Staff role' : 'No role selected'}
@@ -307,7 +317,7 @@ export default function StaffForm({
               className={styles.selectInput}
               value={gender}
               onChange={(e) => setGender(e.target.value)}
-              disabled={saving}
+              disabled={fieldDisabled}
             >
               <option value="">Not specified</option>
               <option value="male">Male</option>
@@ -334,7 +344,7 @@ export default function StaffForm({
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
-              disabled={saving}
+              disabled={fieldDisabled}
             />
             <Input
               label="Joined Date"
@@ -342,7 +352,7 @@ export default function StaffForm({
               type="date"
               value={joinedAt}
               onChange={(e) => setJoinedAt(e.target.value)}
-              disabled={saving}
+              disabled={fieldDisabled}
             />
           </div>
 
@@ -358,20 +368,22 @@ export default function StaffForm({
               clearError('yearsOfExperience');
             }}
             error={errors.yearsOfExperience}
-            disabled={saving}
+            disabled={fieldDisabled}
           />
         </div>
       )}
 
       {childrenBeforeSubmit}
 
-      <div className={styles.bottomSave}>
-        <Button type="submit" variant="primary" size="large" fullWidth disabled={saving}>
-          {saving
-            ? mode === 'create' ? 'Creating…' : 'Saving…'
-            : mode === 'create' ? 'Create Staff' : 'Save Changes'}
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className={styles.bottomSave}>
+          <Button type="submit" variant="primary" size="large" fullWidth disabled={saving}>
+            {saving
+              ? mode === 'create' ? 'Creating…' : 'Saving…'
+              : mode === 'create' ? 'Create Staff' : 'Save Changes'}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

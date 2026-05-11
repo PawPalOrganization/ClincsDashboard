@@ -4,6 +4,7 @@ import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import clinicStaffRolesService from '../../services/clinic/clinicStaffRolesService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
+import { hasAnyClinicPermission, hasClinicPermission } from '../../utils/clinicPermissions';
 import type { ClinicBranch, ClinicStaff, ClinicStaffRole } from '../../types/clinic.types';
 import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
@@ -32,7 +33,7 @@ function fullName(member: ClinicStaff): string {
 }
 
 export default function StaffList() {
-  const { clinicId } = useClinicAuth();
+  const { clinicId, staff: authStaff } = useClinicAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const successMsg = (location.state as { successMsg?: string } | null)?.successMsg ?? '';
@@ -55,6 +56,13 @@ export default function StaffList() {
   const [staffError, setStaffError] = useState('');
   const [rolesError, setRolesError] = useState('');
   const [branchesError, setBranchesError] = useState('');
+
+  const canViewStaff = hasClinicPermission(authStaff, 'clinic-staff.read');
+  const canCreateStaff = hasClinicPermission(authStaff, 'clinic-staff.create');
+  const canOpenStaffDetails = hasAnyClinicPermission(authStaff, [
+    'clinic-staff.update',
+    'clinic-staff.assignments',
+  ]);
 
   const roleById = useMemo(() => {
     const map = new Map<string, string>();
@@ -82,7 +90,7 @@ export default function StaffList() {
   }, [selectedBranchId]);
 
   useEffect(() => {
-    if (!clinicId) {
+    if (!clinicId || !canViewStaff) {
       setLoadingFilters(false);
       return;
     }
@@ -113,7 +121,7 @@ export default function StaffList() {
     }
 
     loadFilters();
-  }, [clinicId]);
+  }, [canViewStaff, clinicId]);
 
   const fetchStaff = useCallback(async () => {
     setLoadingStaff(true);
@@ -140,13 +148,13 @@ export default function StaffList() {
   }, [debouncedSearch, page, selectedBranchId]);
 
   useEffect(() => {
-    if (!clinicId) {
+    if (!clinicId || !canViewStaff) {
       setLoadingStaff(false);
       return;
     }
 
     fetchStaff();
-  }, [clinicId, fetchStaff]);
+  }, [canViewStaff, clinicId, fetchStaff]);
 
   const columns: Column<StaffRow>[] = [
     {
@@ -255,6 +263,16 @@ export default function StaffList() {
     );
   }
 
+  if (!canViewStaff) {
+    return (
+      <div className={styles.accessDenied}>
+        <i className="bi bi-shield-lock" />
+        <h2>Staff access is view-restricted</h2>
+        <p>Your current clinic role does not include permission to view staff members.</p>
+      </div>
+    );
+  }
+
   const isInitialLoad = loadingStaff && !hasLoadedStaff;
 
   return (
@@ -271,13 +289,15 @@ export default function StaffList() {
                 : 'Search and manage clinic staff'}
             </p>
           </div>
-          <Button
-            variant="primary"
-            icon="bi-plus-lg"
-            onClick={() => navigate('/staff/create')}
-          >
-            Create Staff
-          </Button>
+          {canCreateStaff && (
+            <Button
+              variant="primary"
+              icon="bi-plus-lg"
+              onClick={() => navigate('/staff/create')}
+            >
+              Create Staff
+            </Button>
+          )}
         </div>
       )}
 
@@ -355,7 +375,7 @@ export default function StaffList() {
           totalPages={totalPages}
           totalItems={total}
           onPageChange={setPage}
-          onEdit={(row) => navigate(`/staff/${row.id}`)}
+          onEdit={canOpenStaffDetails ? (row) => navigate(`/staff/${row.id}`) : undefined}
           emptyMessage={
             debouncedSearch || selectedBranchId
               ? 'No staff members match your filters.'

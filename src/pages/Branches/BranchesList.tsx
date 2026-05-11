@@ -14,6 +14,24 @@ type BranchRow = ClinicBranch & Record<string, unknown>;
 
 const LIMIT = 10;
 
+type DisplayItem = string | number | { id?: string | number; name?: string; title?: string };
+
+function asDisplayItems(value: unknown): DisplayItem[] {
+  return Array.isArray(value) ? (value as DisplayItem[]) : [];
+}
+
+function displayItemKey(item: DisplayItem, index: number): string {
+  if (typeof item === 'object' && item !== null && item.id != null) {
+    return String(item.id);
+  }
+  return `${String(displayItemLabel(item))}-${index}`;
+}
+
+function displayItemLabel(item: DisplayItem): string {
+  if (typeof item === 'string' || typeof item === 'number') return String(item);
+  return item.name ?? item.title ?? (item.id != null ? String(item.id) : 'Unnamed');
+}
+
 export default function BranchesList() {
   const { clinicId } = useClinicAuth();
   const navigate = useNavigate();
@@ -93,11 +111,14 @@ export default function BranchesList() {
       key: 'serviceIds',
       label: 'Services',
       width: '90px',
-      render: (row) => (
-        <span className={styles.countBadge}>
-          <i className="bi bi-grid" /> {row.serviceIds?.length ?? 0}
-        </span>
-      ),
+      render: (row) => {
+        const services = asDisplayItems(row.serviceIds);
+        return (
+          <span className={styles.countBadge}>
+            <i className="bi bi-grid" /> {services.length}
+          </span>
+        );
+      },
     },
     {
       key: 'workingHours',
@@ -118,19 +139,23 @@ export default function BranchesList() {
       key: 'tags',
       label: 'Tags',
       width: '180px',
-      render: (row) =>
-        row.tags && row.tags.length > 0 ? (
+      render: (row) => {
+        const tags = asDisplayItems(row.tags);
+        return tags.length > 0 ? (
           <div className={styles.tagList}>
-            {row.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className={styles.tag}>{tag}</span>
+            {tags.slice(0, 3).map((tag, index) => (
+              <span key={displayItemKey(tag, index)} className={styles.tag}>
+                {displayItemLabel(tag)}
+              </span>
             ))}
-            {row.tags.length > 3 && (
-              <span className={styles.tagMore}>+{row.tags.length - 3}</span>
+            {tags.length > 3 && (
+              <span className={styles.tagMore}>+{tags.length - 3}</span>
             )}
           </div>
         ) : (
           <span className={styles.noData}>—</span>
-        ),
+        );
+      },
     },
   ];
 

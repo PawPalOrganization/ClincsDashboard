@@ -31,15 +31,18 @@ export interface ClinicLoginResponse {
 // ─── Roles & Permissions ──────────────────────────────────────────────────────
 
 export interface ClinicStaffPermission {
-  id: string;
-  name: string;
-  slug: string;
+  id?: string | number;
+  name?: string;
+  slug?: string;
+  title?: string;
+  key?: string;
+  code?: string;
 }
 
 export interface ClinicStaffRole {
   id: string | number;
   name: string;
-  permissions?: ClinicStaffPermission[];
+  permissions?: Array<ClinicStaffPermission | string>;
 }
 
 // ─── Staff ────────────────────────────────────────────────────────────────────
@@ -56,6 +59,7 @@ export interface ClinicStaff {
   joinedAt?: string;
   roleId?: string | number;
   role?: ClinicStaffRole;
+  permissions?: Array<ClinicStaffPermission | string>;
   clinicBranchId?: string | number;
   branches?: ClinicBranch[];
 }
@@ -96,8 +100,8 @@ export interface ClinicBranch {
   lat?: number;
   lng?: number;
   address?: string;
-  serviceIds?: string[];
-  tags?: string[];
+  serviceIds?: Array<string | number | ClinicService>;
+  tags?: Array<string | number | { id?: string | number; name?: string; title?: string }>;
   workingHours?: BranchWorkingHour[];
 }
 

@@ -4,6 +4,7 @@ import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
 import type {
   BranchWorkingHour,
+  ClinicBranch,
   CreateBranchPayload,
   UpdateBranchPayload,
 } from '../../types/clinic.types';
@@ -21,8 +22,8 @@ export interface BranchFormInitialValues {
   lat?: number;
   lng?: number;
   address?: string;
-  serviceIds?: string[];
-  tags?: string[];
+  serviceIds?: ClinicBranch['serviceIds'];
+  tags?: ClinicBranch['tags'];
   workingHours?: BranchWorkingHour[];
 }
 
@@ -44,6 +45,17 @@ interface BranchFormProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+type DisplayItem = string | number | { id?: string | number; name?: string; title?: string };
+
+function displayItemLabel(item: DisplayItem): string {
+  if (typeof item === 'string' || typeof item === 'number') return String(item);
+  return item.name ?? item.title ?? (item.id != null ? String(item.id) : '');
+}
+
+function displayItemsToRaw(items?: DisplayItem[]): string {
+  return items?.map(displayItemLabel).filter(Boolean).join(', ') ?? '';
+}
 
 function buildDefaultHours(workingHours?: BranchWorkingHour[]): HourEntry[] {
   return ([0, 1, 2, 3, 4, 5, 6] as const).map((d) => {
@@ -75,8 +87,8 @@ export default function BranchForm({
   const [lat, setLat]                 = useState(defaultValues?.lat != null ? String(defaultValues.lat) : '');
   const [lng, setLng]                 = useState(defaultValues?.lng != null ? String(defaultValues.lng) : '');
   const [address, setAddress]         = useState(defaultValues?.address ?? '');
-  const [tagsRaw, setTagsRaw]         = useState(defaultValues?.tags?.join(', ') ?? '');
-  const [serviceIdsRaw, setServiceIdsRaw] = useState(defaultValues?.serviceIds?.join(', ') ?? '');
+  const [tagsRaw, setTagsRaw]         = useState(displayItemsToRaw(defaultValues?.tags));
+  const [serviceIdsRaw, setServiceIdsRaw] = useState(displayItemsToRaw(defaultValues?.serviceIds));
   const [hours, setHours]             = useState<HourEntry[]>(() => buildDefaultHours(defaultValues?.workingHours));
 
   const [titleError, setTitleError] = useState('');
@@ -95,8 +107,8 @@ export default function BranchForm({
     setLat(defaultValues.lat != null ? String(defaultValues.lat) : '');
     setLng(defaultValues.lng != null ? String(defaultValues.lng) : '');
     setAddress(defaultValues.address ?? '');
-    setTagsRaw(defaultValues.tags?.join(', ') ?? '');
-    setServiceIdsRaw(defaultValues.serviceIds?.join(', ') ?? '');
+    setTagsRaw(displayItemsToRaw(defaultValues.tags));
+    setServiceIdsRaw(displayItemsToRaw(defaultValues.serviceIds));
     setHours(buildDefaultHours(defaultValues.workingHours));
   }, [defaultValues]);
 
