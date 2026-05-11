@@ -37,7 +37,7 @@ export interface ClinicStaffPermission {
 }
 
 export interface ClinicStaffRole {
-  id: string;
+  id: string | number;
   name: string;
   permissions?: ClinicStaffPermission[];
 }
@@ -45,17 +45,18 @@ export interface ClinicStaffRole {
 // ─── Staff ────────────────────────────────────────────────────────────────────
 
 export interface ClinicStaff {
-  id: string;
+  id: string | number;
   firstName: string;
   lastName: string;
   email: string;
   bio?: string;
-  gender?: 'male' | 'female';
+  birthDate?: string;
+  gender?: 'male' | 'female' | 'other';
   yearsOfExperience?: number;
   joinedAt?: string;
-  roleId?: string;
+  roleId?: string | number;
   role?: ClinicStaffRole;
-  clinicBranchId?: string;
+  clinicBranchId?: string | number;
   branches?: ClinicBranch[];
 }
 
@@ -85,8 +86,8 @@ export interface BranchWorkingHour {
 
 // isActive intentionally excluded — clinic staff cannot toggle branch status
 export interface ClinicBranch {
-  id: string;
-  clinicId: string;
+  id: string | number;
+  clinicId: string | number;
   title: string;
   description?: string;
   logoUrl?: string;
@@ -162,11 +163,11 @@ export interface CreateClinicStaffPayload {
   email: string;
   password: string;
   bio?: string;
-  gender?: 'male' | 'female';
+  gender?: 'male' | 'female' | 'other';
   yearsOfExperience?: number;
   joinedAt?: string;
-  roleId: string;
-  clinicBranchId: string;
+  roleId?: string | number;
+  clinicBranchId: string | number;
 }
 
 // PUT /clinic/api/clinic-staff/:id
@@ -176,14 +177,15 @@ export interface UpdateClinicStaffPayload {
   bio?: string;
   email?: string;
   password?: string;
-  gender?: 'male' | 'female';
+  birthDate?: string;
+  gender?: 'male' | 'female' | 'other';
   yearsOfExperience?: number;
   joinedAt?: string;
-  roleId?: string;
+  roleId?: string | number;
 }
 
 // PUT /clinic/api/clinic-staff/:id/assignments
 // Sends the full replacement list — not a partial update
 export interface UpdateStaffAssignmentsPayload {
-  clinicBranchIds: string[];
+  clinicBranchIds: Array<string | number>;
 }

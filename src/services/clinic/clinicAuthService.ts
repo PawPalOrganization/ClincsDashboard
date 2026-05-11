@@ -35,8 +35,8 @@ const clinicAuthService = {
 
     const { token, staff } = response.data;
     const firstBranch = staff.branches?.[0];
-    const clinicId = firstBranch?.clinicId ?? '';
-    const branchId = firstBranch?.id ?? '';
+    const clinicId = firstBranch?.clinicId != null ? String(firstBranch.clinicId) : '';
+    const branchId = firstBranch?.id != null ? String(firstBranch.id) : '';
 
     localStorage.setItem(TOKEN_KEY, token);
     localStorage.setItem(STAFF_KEY, JSON.stringify(staff));

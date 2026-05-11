@@ -10,6 +10,9 @@ import ClinicSettings from './pages/Settings/ClinicSettings';
 import BranchesList from './pages/Branches/BranchesList';
 import CreateBranch from './pages/Branches/CreateBranch';
 import EditBranch from './pages/Branches/EditBranch';
+import StaffList from './pages/Staff/StaffList';
+import CreateStaff from './pages/Staff/CreateStaff';
+import EditStaff from './pages/Staff/EditStaff';
 
 // ─── Root redirect ─────────────────────────────────────────────────────────
 // Reads auth state and sends the user to the right place.
@@ -27,31 +30,6 @@ function RootRedirect() {
       to={isAuthenticated ? '/dashboard' : '/login'}
       replace
     />
-  );
-}
-
-// ─── Placeholder ────────────────────────────────────────────────────────────
-// Temporary stand-in rendered for pages not yet built.
-// Replace each route's element with the real page component when ready.
-
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '50vh',
-        gap: '0.75rem',
-        color: '#7f8c8d',
-        textAlign: 'center',
-      }}
-    >
-      <i className="bi bi-tools" style={{ fontSize: '3rem' }} />
-      <h2 style={{ color: '#2c3e50', margin: 0 }}>{title}</h2>
-      <p style={{ margin: 0 }}>This page is under construction.</p>
-    </div>
   );
 }
 
@@ -112,9 +90,9 @@ export default function App() {
               <Route path="/branches"            element={<BranchesList />} />
               <Route path="/branches/create"     element={<CreateBranch />} />
               <Route path="/branches/:branchId"  element={<EditBranch />} />
-              <Route path="/staff"               element={<PlaceholderPage title="Staff" />} />
-              <Route path="/staff/create"        element={<PlaceholderPage title="Create Staff Member" />} />
-              <Route path="/staff/:staffId"      element={<PlaceholderPage title="Staff Member" />} />
+              <Route path="/staff"               element={<StaffList />} />
+              <Route path="/staff/create"        element={<CreateStaff />} />
+              <Route path="/staff/:staffId"      element={<EditStaff />} />
               <Route path="/settings"            element={<ClinicSettings />} />
             </Route>
           </Route>
