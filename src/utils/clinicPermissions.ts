@@ -2,15 +2,25 @@ import type { ClinicStaff } from '../types/clinic.types';
 
 export type ClinicPermissionSlug =
   | 'clinics.read'
+  | 'clinics.create'
   | 'clinics.update'
+  | 'clinics.delete'
+  | 'clinics.approve'
   | 'clinic-branches.read'
   | 'clinic-branches.create'
   | 'clinic-branches.update'
+  | 'clinic-branches.delete'
+  | 'clinic-services.read'
+  | 'clinic-services.create'
+  | 'clinic-services.update'
+  | 'clinic-services.delete'
   | 'clinic-staff.read'
   | 'clinic-staff.create'
   | 'clinic-staff.update'
+  | 'clinic-staff.delete'
   | 'clinic-staff.assignments'
-  | 'clinic-staff-roles.read';
+  | 'clinic-staff-roles.read'
+  | 'clinic-staff-roles.update';
 
 const PRIVILEGED_ROLE_WORDS = ['manager', 'admin', 'owner', 'supervisor'];
 
@@ -33,6 +43,7 @@ function permissionTexts(permission: unknown): string[] {
 
   const record = permission as Record<string, unknown>;
   const values = [
+    record.token,
     record.slug,
     record.name,
     record.title,

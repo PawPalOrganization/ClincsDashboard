@@ -40,6 +40,7 @@ interface BranchFormProps {
   onSubmit: (payload: CreateBranchPayload | UpdateBranchPayload) => Promise<void>;
   saving: boolean;
   serverError: string;
+  readOnly?: boolean;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ export default function BranchForm({
   onSubmit,
   saving,
   serverError,
+  readOnly = false,
 }: BranchFormProps) {
   const [title, setTitle]             = useState(defaultValues?.title ?? '');
   const [description, setDescription] = useState(defaultValues?.description ?? '');
@@ -219,7 +221,7 @@ export default function BranchForm({
           onChange={(e) => { setTitle(e.target.value); if (e.target.value.trim()) setTitleError(''); }}
           error={titleError}
           required
-          disabled={saving}
+          disabled={saving || readOnly}
         />
 
         <div className={styles.field}>
@@ -231,7 +233,7 @@ export default function BranchForm({
             value={description}
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
             rows={3}
-            disabled={saving}
+            disabled={saving || readOnly}
           />
         </div>
 
@@ -242,7 +244,7 @@ export default function BranchForm({
           placeholder="https://example.com/logo.png"
           value={logoUrl}
           onChange={(e) => setLogoUrl(e.target.value)}
-          disabled={saving}
+          disabled={saving || readOnly}
         />
         {logoUrl.trim() && (
           <div className={styles.previewBox}>
@@ -261,7 +263,7 @@ export default function BranchForm({
               type="checkbox"
               checked={isMainBranch}
               onChange={(e) => setIsMainBranch(e.target.checked)}
-              disabled={saving}
+              disabled={saving || readOnly}
             />
             <span className={styles.toggleLabel}>
               <strong>Main Branch</strong>
@@ -275,7 +277,7 @@ export default function BranchForm({
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                disabled={saving}
+                disabled={saving || readOnly}
               />
               <span className={styles.toggleLabel}>
                 <strong>Active</strong>
@@ -304,7 +306,7 @@ export default function BranchForm({
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
             icon="bi-telephone"
-            disabled={saving}
+            disabled={saving || readOnly}
           />
           <Input
             label="Address"
@@ -314,7 +316,7 @@ export default function BranchForm({
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             icon="bi-map"
-            disabled={saving}
+            disabled={saving || readOnly}
           />
         </div>
 
@@ -327,7 +329,7 @@ export default function BranchForm({
             value={lat}
             onChange={(e) => { setLat(e.target.value); setLatError(''); }}
             error={latError}
-            disabled={saving}
+            disabled={saving || readOnly}
           />
           <Input
             label="Longitude"
@@ -337,7 +339,7 @@ export default function BranchForm({
             value={lng}
             onChange={(e) => { setLng(e.target.value); setLngError(''); }}
             error={lngError}
-            disabled={saving}
+            disabled={saving || readOnly}
           />
         </div>
       </div>
@@ -364,7 +366,7 @@ export default function BranchForm({
                   type="checkbox"
                   checked={entry.enabled}
                   onChange={() => toggleDay(entry.dayOfWeek)}
-                  disabled={saving}
+                  disabled={saving || readOnly}
                 />
                 <span className={styles.dayName}>{DAY_NAMES[entry.dayOfWeek]}</span>
               </label>
@@ -376,7 +378,7 @@ export default function BranchForm({
                     className={styles.timeInput}
                     value={entry.startTime}
                     onChange={(e) => updateHour(entry.dayOfWeek, 'startTime', e.target.value)}
-                    disabled={saving}
+                    disabled={saving || readOnly}
                   />
                   <span className={styles.timeSep}>to</span>
                   <input
@@ -384,7 +386,7 @@ export default function BranchForm({
                     className={styles.timeInput}
                     value={entry.endTime}
                     onChange={(e) => updateHour(entry.dayOfWeek, 'endTime', e.target.value)}
-                    disabled={saving}
+                    disabled={saving || readOnly}
                   />
                 </div>
               ) : (
@@ -414,7 +416,7 @@ export default function BranchForm({
             placeholder="e.g. emergency, 24h, cats, dogs"
             value={tagsRaw}
             onChange={(e) => setTagsRaw(e.target.value)}
-            disabled={saving}
+            disabled={saving || readOnly}
           />
           <p className={styles.fieldHint}>Separate tags with commas.</p>
           {parsedTags.length > 0 && (
@@ -434,7 +436,7 @@ export default function BranchForm({
             placeholder="e.g. uuid-1, uuid-2"
             value={serviceIdsRaw}
             onChange={(e) => setServiceIdsRaw(e.target.value)}
-            disabled={saving}
+            disabled={saving || readOnly}
           />
           <p className={styles.fieldHint}>
             <i className="bi bi-info-circle" />
@@ -445,19 +447,21 @@ export default function BranchForm({
       </div>
 
       {/* ── Submit ── */}
-      <div className={styles.bottomSave}>
-        <Button
-          type="submit"
-          variant="primary"
-          size="large"
-          fullWidth
-          disabled={saving}
-        >
-          {saving
-            ? (mode === 'create' ? 'Creating…' : 'Saving…')
-            : (mode === 'create' ? 'Create Branch' : 'Save Changes')}
-        </Button>
-      </div>
+      {!readOnly && (
+        <div className={styles.bottomSave}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="large"
+            fullWidth
+            disabled={saving}
+          >
+            {saving
+              ? (mode === 'create' ? 'Creating…' : 'Saving…')
+              : (mode === 'create' ? 'Create Branch' : 'Save Changes')}
+          </Button>
+        </div>
+      )}
 
     </form>
   );

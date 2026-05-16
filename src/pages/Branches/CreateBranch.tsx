@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
+import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type { CreateBranchPayload, UpdateBranchPayload } from '../../types/clinic.types';
 import BranchForm from './BranchForm';
 import Button from '../../components/common/Button/Button';
@@ -9,8 +10,9 @@ import PawLoader from '../../components/common/PawLoader/PawLoader';
 import styles from './Branches.module.scss';
 
 export default function CreateBranch() {
-  const { clinicId } = useClinicAuth();
+  const { clinicId, staff } = useClinicAuth();
   const navigate = useNavigate();
+  const canCreateBranch = hasClinicPermission(staff, 'clinic-branches.create');
 
   const [saving, setSaving]           = useState(false);
   const [serverError, setServerError] = useState('');
@@ -33,6 +35,19 @@ export default function CreateBranch() {
       <div className={styles.noClinic}>
         <i className="bi bi-exclamation-circle" />
         <p>No clinic assigned to your account. Contact your administrator.</p>
+      </div>
+    );
+  }
+
+  if (!canCreateBranch) {
+    return (
+      <div className={styles.accessDenied}>
+        <i className="bi bi-shield-lock" />
+        <h2>Create branch is restricted</h2>
+        <p>Your current role does not include permission to create branches.</p>
+        <Button variant="outline" icon="bi-arrow-left" onClick={() => navigate('/branches')}>
+          Back to Branches
+        </Button>
       </div>
     );
   }

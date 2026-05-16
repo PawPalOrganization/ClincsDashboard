@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
+import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type { ClinicBranch } from '../../types/clinic.types';
 import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
@@ -33,9 +34,13 @@ function displayItemLabel(item: DisplayItem): string {
 }
 
 export default function BranchesList() {
-  const { clinicId } = useClinicAuth();
+  const { clinicId, staff } = useClinicAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const canViewBranches   = hasClinicPermission(staff, 'clinic-branches.read');
+  const canCreateBranch   = hasClinicPermission(staff, 'clinic-branches.create');
+  const canUpdateBranch   = hasClinicPermission(staff, 'clinic-branches.update');
   const successMsg = (location.state as { successMsg?: string } | null)?.successMsg ?? '';
 
   const [branches, setBranches]       = useState<BranchRow[]>([]);
@@ -168,6 +173,16 @@ export default function BranchesList() {
     );
   }
 
+  if (!canViewBranches) {
+    return (
+      <div className={styles.accessDenied}>
+        <i className="bi bi-shield-lock" />
+        <h2>Branches access is restricted</h2>
+        <p>Your current role does not include permission to view branches.</p>
+      </div>
+    );
+  }
+
   const isInitialLoad = loading && !hasLoaded;
 
   return (
@@ -186,13 +201,15 @@ export default function BranchesList() {
                 : 'Manage your clinic branches'}
             </p>
           </div>
-          <Button
-            variant="primary"
-            icon="bi-plus-lg"
-            onClick={() => navigate('/branches/create')}
-          >
-            New Branch
-          </Button>
+          {canCreateBranch && (
+            <Button
+              variant="primary"
+              icon="bi-plus-lg"
+              onClick={() => navigate('/branches/create')}
+            >
+              New Branch
+            </Button>
+          )}
         </div>
       )}
 
@@ -222,7 +239,7 @@ export default function BranchesList() {
           totalPages={totalPages}
           totalItems={total}
           onPageChange={(p) => fetchBranches(p)}
-          onEdit={(row) => navigate(`/branches/${row.id}`)}
+          onEdit={canUpdateBranch ? (row) => navigate(`/branches/${row.id}`) : undefined}
           emptyMessage="No branches found. Create your first branch to get started."
         />
       )}

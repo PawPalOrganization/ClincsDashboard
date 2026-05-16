@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicProfileService from '../../services/clinic/clinicProfileService';
+import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type { UpdateClinicPayload } from '../../types/clinic.types';
 import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
@@ -72,7 +73,10 @@ function SettingsSkeleton() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ClinicSettings() {
-  const { clinicId } = useClinicAuth();
+  const { clinicId, staff } = useClinicAuth();
+  const canViewClinic   = hasClinicPermission(staff, 'clinics.read');
+  const canUpdateClinic = hasClinicPermission(staff, 'clinics.update');
+  const readOnly = !canUpdateClinic;
 
   const [form, setForm]           = useState<SettingsForm>(EMPTY_FORM);
   const [loading, setLoading]     = useState(true);
@@ -173,6 +177,16 @@ export default function ClinicSettings() {
     );
   }
 
+  if (!canViewClinic) {
+    return (
+      <div className={styles.accessDenied}>
+        <i className="bi bi-shield-lock" />
+        <h2>Settings access is restricted</h2>
+        <p>Your current role does not include permission to view clinic settings.</p>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <form onSubmit={handleSubmit} noValidate className={styles.form}>
@@ -185,13 +199,15 @@ export default function ClinicSettings() {
               Update your clinic's public profile information
             </p>
           </div>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={saving}
-          >
-            {saving ? 'Saving…' : 'Save Changes'}
-          </Button>
+          {!readOnly && (
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </Button>
+          )}
         </div>
 
         {/* ── Feedback banners ── */}
@@ -225,7 +241,7 @@ export default function ClinicSettings() {
             onChange={handleInputChange}
             error={titleError}
             required
-            disabled={saving}
+            disabled={saving || readOnly}
           />
           <Input
             label="Name in Arabic"
@@ -234,7 +250,7 @@ export default function ClinicSettings() {
             placeholder="الاسم بالعربية"
             value={form.titleInArabic}
             onChange={handleInputChange}
-            disabled={saving}
+            disabled={saving || readOnly}
           />
           <div className={styles.field}>
             <label className={styles.fieldLabel}>Description</label>
@@ -245,7 +261,7 @@ export default function ClinicSettings() {
               value={form.description}
               onChange={handleTextareaChange}
               rows={4}
-              disabled={saving}
+              disabled={saving || readOnly}
             />
           </div>
         </div>
@@ -269,7 +285,7 @@ export default function ClinicSettings() {
               value={form.email}
               onChange={handleInputChange}
               icon="bi-envelope"
-              disabled={saving}
+              disabled={saving || readOnly}
             />
             <Input
               label="Website"
@@ -279,7 +295,7 @@ export default function ClinicSettings() {
               value={form.website}
               onChange={handleInputChange}
               icon="bi-globe"
-              disabled={saving}
+              disabled={saving || readOnly}
             />
           </div>
         </div>
@@ -304,7 +320,7 @@ export default function ClinicSettings() {
                 placeholder="https://example.com/logo.png"
                 value={form.logoUrl}
                 onChange={handleInputChange}
-                disabled={saving}
+                disabled={saving || readOnly}
               />
               {form.logoUrl.trim() && (
                 <div className={styles.previewBox}>
@@ -328,7 +344,7 @@ export default function ClinicSettings() {
                 placeholder="https://example.com/cover.jpg"
                 value={form.coverUrl}
                 onChange={handleInputChange}
-                disabled={saving}
+                disabled={saving || readOnly}
               />
               {form.coverUrl.trim() && (
                 <div className={styles.previewBoxWide}>
@@ -348,17 +364,19 @@ export default function ClinicSettings() {
         </div>
 
         {/* ── Bottom save ── */}
-        <div className={styles.bottomSave}>
-          <Button
-            type="submit"
-            variant="primary"
-            size="large"
-            fullWidth
-            disabled={saving}
-          >
-            {saving ? 'Saving…' : 'Save Changes'}
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className={styles.bottomSave}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="large"
+              fullWidth
+              disabled={saving}
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </Button>
+          </div>
+        )}
 
       </form>
     </div>

@@ -34,6 +34,7 @@ export interface ClinicStaffPermission {
   id?: string | number;
   name?: string;
   slug?: string;
+  token?: string;
   title?: string;
   key?: string;
   code?: string;

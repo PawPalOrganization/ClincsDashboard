@@ -1,5 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../../context/ClinicAuthContext';
+import { hasClinicPermission } from '../../../utils/clinicPermissions';
+import type { ClinicPermissionSlug } from '../../../utils/clinicPermissions';
 import styles from './ClinicSidebar.module.scss';
 
 interface ClinicSidebarProps {
@@ -7,15 +9,26 @@ interface ClinicSidebarProps {
   onClose: () => void;
 }
 
-const NAV_ITEMS = [
+interface NavItem {
+  path: string;
+  icon: string;
+  label: string;
+  permission?: ClinicPermissionSlug;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { path: '/dashboard', icon: 'bi-grid',     label: 'Dashboard' },
-  { path: '/branches',  icon: 'bi-building', label: 'Branches'  },
-  { path: '/staff',     icon: 'bi-people',   label: 'Staff'     },
-  { path: '/settings',  icon: 'bi-gear',     label: 'Settings'  },
+  { path: '/branches',  icon: 'bi-building', label: 'Branches',  permission: 'clinic-branches.read' },
+  { path: '/staff',     icon: 'bi-people',   label: 'Staff',     permission: 'clinic-staff.read'    },
+  { path: '/settings',  icon: 'bi-gear',     label: 'Settings',  permission: 'clinics.read'         },
 ];
 
 export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
   const { staff, logout } = useClinicAuth();
+
+  const visibleNavItems = NAV_ITEMS.filter(
+    (item) => !item.permission || hasClinicPermission(staff, item.permission),
+  );
   const navigate = useNavigate();
 
   const staffName =
@@ -51,7 +64,7 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
       {/* Main navigation */}
       <nav className={styles.nav}>
         <ul className={styles.navList}>
-          {NAV_ITEMS.map((item) => (
+          {visibleNavItems.map((item) => (
             <li key={item.path}>
               <NavLink
                 to={item.path}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
+import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type { ClinicBranch, CreateBranchPayload, UpdateBranchPayload } from '../../types/clinic.types';
 import BranchForm from './BranchForm';
 import type { BranchFormInitialValues } from './BranchForm';
@@ -12,9 +13,11 @@ import TablePageSkeleton from '../../components/common/Skeleton/TablePageSkeleto
 import styles from './Branches.module.scss';
 
 export default function EditBranch() {
-  const { clinicId }          = useClinicAuth();
+  const { clinicId, staff }   = useClinicAuth();
   const { branchId }          = useParams<{ branchId: string }>();
   const navigate              = useNavigate();
+  const canViewBranches       = hasClinicPermission(staff, 'clinic-branches.read');
+  const canUpdateBranch       = hasClinicPermission(staff, 'clinic-branches.update');
 
   const [branch, setBranch]           = useState<ClinicBranch | null>(null);
   const [loading, setLoading]         = useState(true);
@@ -60,6 +63,19 @@ export default function EditBranch() {
       <div className={styles.noClinic}>
         <i className="bi bi-exclamation-circle" />
         <p>No clinic assigned to your account. Contact your administrator.</p>
+      </div>
+    );
+  }
+
+  if (!canViewBranches) {
+    return (
+      <div className={styles.accessDenied}>
+        <i className="bi bi-shield-lock" />
+        <h2>Branch access is restricted</h2>
+        <p>Your current role does not include permission to view branches.</p>
+        <Button variant="outline" icon="bi-arrow-left" onClick={() => navigate('/branches')}>
+          Back to Branches
+        </Button>
       </div>
     );
   }
@@ -131,6 +147,7 @@ export default function EditBranch() {
             onSubmit={handleSubmit}
             saving={saving}
             serverError={serverError}
+            readOnly={!canUpdateBranch}
           />
         )}
 
