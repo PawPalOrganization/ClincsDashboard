@@ -108,11 +108,11 @@ export default function BranchesList() {
         ),
     },
     {
-      key: 'serviceIds',
+      key: 'services',
       label: 'Services',
       width: '90px',
       render: (row) => {
-        const services = asDisplayItems(row.serviceIds);
+        const services = asDisplayItems(row.services);
         return (
           <span className={styles.countBadge}>
             <i className="bi bi-grid" /> {services.length}
