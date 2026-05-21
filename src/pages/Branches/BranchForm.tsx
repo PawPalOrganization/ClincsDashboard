@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
+import MapPicker from '../../components/common/MapPicker/MapPicker';
 import type {
   BranchWorkingHour,
   ClinicBranch,
@@ -58,6 +59,14 @@ function displayItemsToRaw(items?: DisplayItem[]): string {
   return items?.map(displayItemLabel).filter(Boolean).join(', ') ?? '';
 }
 
+function parseAddressParts(address?: string): { city: string; area: string; street: string } {
+  if (!address?.trim()) return { city: '', area: '', street: '' };
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 3) return { street: parts[0], area: parts[1], city: parts.slice(2).join(', ') };
+  if (parts.length === 2) return { street: '', area: parts[0], city: parts[1] };
+  return { street: '', area: parts[0], city: '' };
+}
+
 function buildDefaultHours(workingHours?: BranchWorkingHour[]): HourEntry[] {
   return ([0, 1, 2, 3, 4, 5, 6] as const).map((d) => {
     const existing = workingHours?.find((h) => h.dayOfWeek === d);
@@ -86,9 +95,11 @@ export default function BranchForm({
   const [isMainBranch, setIsMainBranch] = useState(defaultValues?.isMainBranch ?? false);
   const [isActive, setIsActive]       = useState(defaultValues?.isActive ?? true);
   const [phoneNumber, setPhoneNumber] = useState(defaultValues?.phoneNumber ?? '');
-  const [lat, setLat]                 = useState(defaultValues?.lat != null ? String(defaultValues.lat) : '');
-  const [lng, setLng]                 = useState(defaultValues?.lng != null ? String(defaultValues.lng) : '');
-  const [address, setAddress]         = useState(defaultValues?.address ?? '');
+  const [lat, setLat]                 = useState<number | null>(defaultValues?.lat ?? null);
+  const [lng, setLng]                 = useState<number | null>(defaultValues?.lng ?? null);
+  const [addressCity, setAddressCity]   = useState(() => parseAddressParts(defaultValues?.address).city);
+  const [addressArea, setAddressArea]   = useState(() => parseAddressParts(defaultValues?.address).area);
+  const [addressStreet, setAddressStreet] = useState(() => parseAddressParts(defaultValues?.address).street);
   const [tags, setTags]               = useState<string[]>(() =>
     (defaultValues?.tags ?? []).map(displayItemLabel).filter(Boolean),
   );
@@ -97,8 +108,6 @@ export default function BranchForm({
   const [hours, setHours]             = useState<HourEntry[]>(() => buildDefaultHours(defaultValues?.workingHours));
 
   const [titleError, setTitleError] = useState('');
-  const [latError, setLatError]     = useState('');
-  const [lngError, setLngError]     = useState('');
 
   // Re-populate when data arrives after mount (edit mode async fetch)
   useEffect(() => {
@@ -109,9 +118,12 @@ export default function BranchForm({
     setIsMainBranch(defaultValues.isMainBranch ?? false);
     setIsActive(defaultValues.isActive ?? true);
     setPhoneNumber(defaultValues.phoneNumber ?? '');
-    setLat(defaultValues.lat != null ? String(defaultValues.lat) : '');
-    setLng(defaultValues.lng != null ? String(defaultValues.lng) : '');
-    setAddress(defaultValues.address ?? '');
+    setLat(defaultValues.lat ?? null);
+    setLng(defaultValues.lng ?? null);
+    const addrParts = parseAddressParts(defaultValues.address);
+    setAddressCity(addrParts.city);
+    setAddressArea(addrParts.area);
+    setAddressStreet(addrParts.street);
     setTags((defaultValues.tags ?? []).map(displayItemLabel).filter(Boolean));
     setServiceIdsRaw(displayItemsToRaw(defaultValues.serviceIds));
     setHours(buildDefaultHours(defaultValues.workingHours));
@@ -162,30 +174,6 @@ export default function BranchForm({
       setTitleError('');
     }
 
-    if (lat.trim()) {
-      const n = parseFloat(lat);
-      if (isNaN(n) || n < -90 || n > 90) {
-        setLatError('Must be between -90 and 90.');
-        valid = false;
-      } else {
-        setLatError('');
-      }
-    } else {
-      setLatError('');
-    }
-
-    if (lng.trim()) {
-      const n = parseFloat(lng);
-      if (isNaN(n) || n < -180 || n > 180) {
-        setLngError('Must be between -180 and 180.');
-        valid = false;
-      } else {
-        setLngError('');
-      }
-    } else {
-      setLngError('');
-    }
-
     if (!valid) return;
 
     const workingHours: BranchWorkingHour[] = hours
@@ -201,9 +189,9 @@ export default function BranchForm({
       logoUrl: logoUrl.trim() || undefined,
       isMainBranch,
       phoneNumber: phoneNumber.trim() || undefined,
-      lat: lat.trim() ? parseFloat(lat) : undefined,
-      lng: lng.trim() ? parseFloat(lng) : undefined,
-      address: address.trim() || undefined,
+      lat: lat ?? undefined,
+      lng: lng ?? undefined,
+      address: [addressStreet, addressArea, addressCity].map((p) => p.trim()).filter(Boolean).join(', ') || undefined,
       serviceIds: serviceIds.length > 0 ? serviceIds : undefined,
       tags: committedTags.length > 0 ? committedTags : undefined,
       workingHours: workingHours.length > 0 ? workingHours : undefined,
@@ -318,51 +306,57 @@ export default function BranchForm({
           <p className={styles.sectionDesc}>Phone number, address, and map coordinates.</p>
         </div>
 
+        <Input
+          label="Phone Number"
+          name="phoneNumber"
+          type="tel"
+          placeholder="+1 555 000 0000"
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
+          icon="bi-telephone"
+          disabled={saving || readOnly}
+        />
+
         <div className={styles.twoCol}>
           <Input
-            label="Phone Number"
-            name="phoneNumber"
-            type="tel"
-            placeholder="+1 555 000 0000"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            icon="bi-telephone"
+            label="City"
+            name="addressCity"
+            type="text"
+            placeholder="e.g. Cairo, Giza, Alexandria"
+            value={addressCity}
+            onChange={(e) => setAddressCity(e.target.value)}
+            icon="bi-building-fill"
             disabled={saving || readOnly}
           />
           <Input
-            label="Address"
-            name="address"
+            label="Area / District"
+            name="addressArea"
             type="text"
-            placeholder="123 Main St, City, Country"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            placeholder="e.g. Maadi, Zamalek, Nasr City"
+            value={addressArea}
+            onChange={(e) => setAddressArea(e.target.value)}
             icon="bi-map"
             disabled={saving || readOnly}
           />
         </div>
 
-        <div className={styles.twoCol}>
-          <Input
-            label="Latitude"
-            name="lat"
-            type="text"
-            placeholder="e.g. 25.2048"
-            value={lat}
-            onChange={(e) => { setLat(e.target.value); setLatError(''); }}
-            error={latError}
-            disabled={saving || readOnly}
-          />
-          <Input
-            label="Longitude"
-            name="lng"
-            type="text"
-            placeholder="e.g. 55.2708"
-            value={lng}
-            onChange={(e) => { setLng(e.target.value); setLngError(''); }}
-            error={lngError}
-            disabled={saving || readOnly}
-          />
-        </div>
+        <Input
+          label="Street / Building"
+          name="addressStreet"
+          type="text"
+          placeholder="e.g. 12 Ahmed Orabi St, Floor 3"
+          value={addressStreet}
+          onChange={(e) => setAddressStreet(e.target.value)}
+          icon="bi-signpost"
+          disabled={saving || readOnly}
+        />
+
+        <MapPicker
+          lat={lat}
+          lng={lng}
+          onChange={(newLat, newLng) => { setLat(newLat); setLng(newLng); }}
+          disabled={saving || readOnly}
+        />
       </div>
 
       {/* ── Working Hours ── */}
