@@ -22,7 +22,7 @@ export type ClinicPermissionSlug =
   | 'clinic-staff-roles.read'
   | 'clinic-staff-roles.update';
 
-const PRIVILEGED_ROLE_WORDS = ['manager', 'admin', 'owner', 'supervisor'];
+const PRIVILEGED_ROLE_WORDS = ['owner'];
 
 function normalized(value?: string): string {
   return value?.trim().toLowerCase() ?? '';

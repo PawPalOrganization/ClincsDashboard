@@ -63,6 +63,8 @@ export default function StaffList() {
     'clinic-staff.update',
     'clinic-staff.assignments',
   ]);
+  const canLoadRoles    = hasClinicPermission(authStaff, 'clinic-staff-roles.read');
+  const canLoadBranches = hasClinicPermission(authStaff, 'clinic-branches.read');
 
   const roleById = useMemo(() => {
     const map = new Map<string, string>();
@@ -100,20 +102,22 @@ export default function StaffList() {
       setRolesError('');
       setBranchesError('');
 
+      const SKIP = Promise.resolve(null);
+
       const [rolesRes, branchesRes] = await Promise.allSettled([
-        clinicStaffRolesService.list(),
-        clinicBranchesService.list(clinicId!, 1, 100),
+        canLoadRoles    ? clinicStaffRolesService.list() : SKIP,
+        canLoadBranches ? clinicBranchesService.list(clinicId!, 1, 100) : SKIP,
       ]);
 
-      if (rolesRes.status === 'fulfilled') {
-        setRoles(rolesRes.value);
-      } else {
+      if (rolesRes.status === 'fulfilled' && rolesRes.value) {
+        setRoles(rolesRes.value as Awaited<ReturnType<typeof clinicStaffRolesService.list>>);
+      } else if (rolesRes.status === 'rejected') {
         setRolesError('Could not load staff roles.');
       }
 
-      if (branchesRes.status === 'fulfilled') {
-        setBranches(branchesRes.value.items);
-      } else {
+      if (branchesRes.status === 'fulfilled' && branchesRes.value) {
+        setBranches((branchesRes.value as Awaited<ReturnType<typeof clinicBranchesService.list>>).items);
+      } else if (branchesRes.status === 'rejected') {
         setBranchesError('Could not load branch filter options.');
       }
 
@@ -121,7 +125,7 @@ export default function StaffList() {
     }
 
     loadFilters();
-  }, [canViewStaff, clinicId]);
+  }, [canViewStaff, canLoadRoles, canLoadBranches, clinicId]);
 
   const fetchStaff = useCallback(async () => {
     setLoadingStaff(true);

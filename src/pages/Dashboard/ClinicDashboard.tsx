@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicApi from '../../services/clinic/clinicApi';
+import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type {
   ApiResponse,
   Clinic,
@@ -92,6 +93,10 @@ function NoClinic() {
 export default function ClinicDashboard() {
   const { staff: authStaff, clinicId, branchId } = useClinicAuth();
 
+  const canViewClinic    = hasClinicPermission(authStaff, 'clinics.read');
+  const canViewBranches  = hasClinicPermission(authStaff, 'clinic-branches.read');
+  const canViewStaff     = hasClinicPermission(authStaff, 'clinic-staff.read');
+
   const [loading, setLoading]           = useState(true);
   const [clinic, setClinic]             = useState<Clinic | null>(null);
   const [branches, setBranches]         = useState<ClinicBranch[]>([]);
@@ -113,38 +118,46 @@ export default function ClinicDashboard() {
     }
 
     async function load() {
+      const SKIP = Promise.resolve(null);
+
       const [clinicRes, branchesRes, staffRes] = await Promise.allSettled([
-        clinicApi.get<ApiResponse<Clinic>>(`/clinics/${clinicId}`),
-        clinicApi.get<PaginatedResponse<ClinicBranch>>(`/clinics/${clinicId}/branches`),
-        clinicApi.get<PaginatedResponse<ClinicStaff>>('/clinic-staff', { page: 1, limit: 5 }),
+        canViewClinic   ? clinicApi.get<ApiResponse<Clinic>>(`/clinics/${clinicId}`) : SKIP,
+        canViewBranches ? clinicApi.get<PaginatedResponse<ClinicBranch>>(`/clinics/${clinicId}/branches`) : SKIP,
+        canViewStaff    ? clinicApi.get<PaginatedResponse<ClinicStaff>>('/clinic-staff', { page: 1, limit: 5 }) : SKIP,
       ]);
 
       const nextErrors: typeof errors = {};
 
-      if (clinicRes.status === 'fulfilled') {
-        setClinic(clinicRes.value.data);
-      } else {
-        nextErrors.clinic = 'Could not load clinic info.';
+      if (canViewClinic) {
+        if (clinicRes.status === 'fulfilled' && clinicRes.value) {
+          setClinic((clinicRes.value as ApiResponse<Clinic>).data);
+        } else if (clinicRes.status === 'rejected') {
+          nextErrors.clinic = 'Could not load clinic info.';
+        }
       }
 
-      if (branchesRes.status === 'fulfilled') {
-        const raw = branchesRes.value.data;
-        const items = Array.isArray(raw) ? (raw as ClinicBranch[]) : raw.items;
-        const count = Array.isArray(raw) ? raw.length : raw.meta.total;
-        setBranches(items);
-        setTotalBranches(count);
-      } else {
-        nextErrors.branches = 'Could not load branches.';
+      if (canViewBranches) {
+        if (branchesRes.status === 'fulfilled' && branchesRes.value) {
+          const raw = (branchesRes.value as PaginatedResponse<ClinicBranch>).data;
+          const items = Array.isArray(raw) ? (raw as ClinicBranch[]) : raw.items;
+          const count = Array.isArray(raw) ? raw.length : raw.meta.total;
+          setBranches(items);
+          setTotalBranches(count);
+        } else if (branchesRes.status === 'rejected') {
+          nextErrors.branches = 'Could not load branches.';
+        }
       }
 
-      if (staffRes.status === 'fulfilled') {
-        const raw = staffRes.value.data;
-        const items = Array.isArray(raw) ? (raw as ClinicStaff[]) : raw.items;
-        const count = Array.isArray(raw) ? raw.length : raw.meta.total;
-        setStaffList(items);
-        setTotalStaff(count);
-      } else {
-        nextErrors.staff = 'Could not load staff.';
+      if (canViewStaff) {
+        if (staffRes.status === 'fulfilled' && staffRes.value) {
+          const raw = (staffRes.value as PaginatedResponse<ClinicStaff>).data;
+          const items = Array.isArray(raw) ? (raw as ClinicStaff[]) : raw.items;
+          const count = Array.isArray(raw) ? raw.length : raw.meta.total;
+          setStaffList(items);
+          setTotalStaff(count);
+        } else if (staffRes.status === 'rejected') {
+          nextErrors.staff = 'Could not load staff.';
+        }
       }
 
       setErrors(nextErrors);
@@ -152,7 +165,7 @@ export default function ClinicDashboard() {
     }
 
     load();
-  }, [clinicId]);
+  }, [clinicId, canViewClinic, canViewBranches, canViewStaff]);
 
   if (loading) return <DashboardSkeleton />;
   if (!clinicId) return <NoClinic />;
@@ -160,29 +173,31 @@ export default function ClinicDashboard() {
   const myBranch = branches.find((b) => b.id === branchId);
   const myBranchLabel = myBranch?.title ?? (branchId ? '—' : 'Not assigned');
 
+  const canViewSettings = hasClinicPermission(authStaff, 'clinics.read');
+
   const quickActions = [
-    {
+    canViewBranches && {
       to: '/branches',
       icon: 'bi-building',
       title: 'Manage Branches',
       desc: 'View and manage clinic branches',
       accent: '#0d9aff',
     },
-    {
+    canViewStaff && {
       to: '/staff',
       icon: 'bi-people-fill',
       title: 'Manage Staff',
       desc: 'View and manage clinic staff members',
       accent: '#10b981',
     },
-    {
+    canViewSettings && {
       to: '/settings',
       icon: 'bi-gear-fill',
       title: 'Clinic Settings',
       desc: 'Update clinic information and details',
       accent: '#f59e0b',
     },
-  ] as const;
+  ].filter(Boolean) as Array<{ to: string; icon: string; title: string; desc: string; accent: string }>;
 
   return (
     <div className={styles.page}>
@@ -215,33 +230,37 @@ export default function ClinicDashboard() {
       {/* ── Stats ── */}
       <div className={styles.statsGrid}>
 
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ background: 'rgba(13,154,255,0.10)', color: '#0d9aff' }}>
-            <i className="bi bi-building" />
+        {canViewBranches && (
+          <div className={styles.statCard}>
+            <div className={styles.statIcon} style={{ background: 'rgba(13,154,255,0.10)', color: '#0d9aff' }}>
+              <i className="bi bi-building" />
+            </div>
+            {errors.branches ? (
+              <div className={styles.statNoData}>No data to display</div>
+            ) : totalBranches === 0 ? (
+              <div className={styles.statNoData}>No branches yet</div>
+            ) : (
+              <div className={styles.statNumber}>{totalBranches}</div>
+            )}
+            <div className={styles.statLabel}>Branches</div>
           </div>
-          {errors.branches ? (
-            <div className={styles.statNoData}>No data to display</div>
-          ) : totalBranches === 0 ? (
-            <div className={styles.statNoData}>No branches yet</div>
-          ) : (
-            <div className={styles.statNumber}>{totalBranches}</div>
-          )}
-          <div className={styles.statLabel}>Branches</div>
-        </div>
+        )}
 
-        <div className={styles.statCard}>
-          <div className={styles.statIcon} style={{ background: 'rgba(16,185,129,0.10)', color: '#10b981' }}>
-            <i className="bi bi-people-fill" />
+        {canViewStaff && (
+          <div className={styles.statCard}>
+            <div className={styles.statIcon} style={{ background: 'rgba(16,185,129,0.10)', color: '#10b981' }}>
+              <i className="bi bi-people-fill" />
+            </div>
+            {errors.staff ? (
+              <div className={styles.statNoData}>No data to display</div>
+            ) : totalStaff === 0 ? (
+              <div className={styles.statNoData}>No staff yet</div>
+            ) : (
+              <div className={styles.statNumber}>{totalStaff}</div>
+            )}
+            <div className={styles.statLabel}>Staff Members</div>
           </div>
-          {errors.staff ? (
-            <div className={styles.statNoData}>No data to display</div>
-          ) : totalStaff === 0 ? (
-            <div className={styles.statNoData}>No staff yet</div>
-          ) : (
-            <div className={styles.statNumber}>{totalStaff}</div>
-          )}
-          <div className={styles.statLabel}>Staff Members</div>
-        </div>
+        )}
 
         <div className={styles.statCard}>
           <div className={styles.statIcon} style={{ background: 'rgba(245,158,11,0.10)', color: '#f59e0b' }}>
@@ -282,41 +301,45 @@ export default function ClinicDashboard() {
       </div>
 
       {/* ── Recent staff ── */}
-      <h2 className={styles.sectionTitle}>Recent Staff</h2>
-      <div className={styles.staffCard}>
+      {canViewStaff && (
+        <>
+          <h2 className={styles.sectionTitle}>Recent Staff</h2>
+          <div className={styles.staffCard}>
 
-        {(errors.staff || staffList.length === 0) && (
-          <div className={styles.emptyState}>
-            <i className="bi bi-people" />
-            <p>No data to display.</p>
-          </div>
-        )}
-
-        {!errors.staff && staffList.map((member) => (
-          <div key={member.id} className={styles.staffRow}>
-            <div className={styles.staffAvatar}>
-              {initials(member.firstName, member.lastName)}
-            </div>
-            <div className={styles.staffInfo}>
-              <div className={styles.staffName}>
-                {member.firstName} {member.lastName}
+            {(errors.staff || staffList.length === 0) && (
+              <div className={styles.emptyState}>
+                <i className="bi bi-people" />
+                <p>No data to display.</p>
               </div>
-              <div className={styles.staffEmail}>{member.email}</div>
-            </div>
-            {member.role && (
-              <span className={styles.roleBadge}>{member.role.name}</span>
             )}
+
+            {!errors.staff && staffList.map((member) => (
+              <div key={member.id} className={styles.staffRow}>
+                <div className={styles.staffAvatar}>
+                  {initials(member.firstName, member.lastName)}
+                </div>
+                <div className={styles.staffInfo}>
+                  <div className={styles.staffName}>
+                    {member.firstName} {member.lastName}
+                  </div>
+                  <div className={styles.staffEmail}>{member.email}</div>
+                </div>
+                {member.role && (
+                  <span className={styles.roleBadge}>{member.role.name}</span>
+                )}
+              </div>
+            ))}
+
+            {!errors.staff && totalStaff > 5 && (
+              <Link to="/staff" className={styles.viewAll}>
+                View all {totalStaff} staff members
+                <i className="bi bi-arrow-right" />
+              </Link>
+            )}
+
           </div>
-        ))}
-
-        {!errors.staff && totalStaff > 5 && (
-          <Link to="/staff" className={styles.viewAll}>
-            View all {totalStaff} staff members
-            <i className="bi bi-arrow-right" />
-          </Link>
-        )}
-
-      </div>
+        </>
+      )}
 
     </div>
   );

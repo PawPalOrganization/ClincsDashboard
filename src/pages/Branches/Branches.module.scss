@@ -147,6 +147,87 @@
   align-self: center;
 }
 
+// ─── Tag chip input ───────────────────────────────────────────────────────────
+
+.tagInputWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 42px;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  cursor: text;
+  transition: border-color 0.15s;
+
+  &:focus-within {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+}
+
+.tagInputDisabled {
+  background: #f9fafb;
+  cursor: not-allowed;
+}
+
+.tagChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem 0.2rem 0.6rem;
+  white-space: nowrap;
+}
+
+.tagChipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: #60a5fa;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.1s, color 0.1s;
+
+  &:hover {
+    background: #bfdbfe;
+    color: #1e40af;
+  }
+}
+
+.tagChipInput {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.875rem;
+  color: #111827;
+  padding: 0.1rem 0;
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
 // ─── No clinic state ──────────────────────────────────────────────────────────
 
 .noClinic {

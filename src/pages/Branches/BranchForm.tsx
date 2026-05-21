@@ -89,7 +89,10 @@ export default function BranchForm({
   const [lat, setLat]                 = useState(defaultValues?.lat != null ? String(defaultValues.lat) : '');
   const [lng, setLng]                 = useState(defaultValues?.lng != null ? String(defaultValues.lng) : '');
   const [address, setAddress]         = useState(defaultValues?.address ?? '');
-  const [tagsRaw, setTagsRaw]         = useState(displayItemsToRaw(defaultValues?.tags));
+  const [tags, setTags]               = useState<string[]>(() =>
+    (defaultValues?.tags ?? []).map(displayItemLabel).filter(Boolean),
+  );
+  const [tagInput, setTagInput]       = useState('');
   const [serviceIdsRaw, setServiceIdsRaw] = useState(displayItemsToRaw(defaultValues?.serviceIds));
   const [hours, setHours]             = useState<HourEntry[]>(() => buildDefaultHours(defaultValues?.workingHours));
 
@@ -109,13 +112,31 @@ export default function BranchForm({
     setLat(defaultValues.lat != null ? String(defaultValues.lat) : '');
     setLng(defaultValues.lng != null ? String(defaultValues.lng) : '');
     setAddress(defaultValues.address ?? '');
-    setTagsRaw(displayItemsToRaw(defaultValues.tags));
+    setTags((defaultValues.tags ?? []).map(displayItemLabel).filter(Boolean));
     setServiceIdsRaw(displayItemsToRaw(defaultValues.serviceIds));
     setHours(buildDefaultHours(defaultValues.workingHours));
   }, [defaultValues]);
 
-  // Derived: live tag chip preview
-  const parsedTags = tagsRaw.split(',').map((t) => t.trim()).filter(Boolean);
+  function commitTag() {
+    const value = tagInput.trim().replace(/,+$/, '').trim();
+    if (value && !tags.includes(value)) {
+      setTags((prev) => [...prev, value]);
+    }
+    setTagInput('');
+  }
+
+  function handleTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      commitTag();
+    } else if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
+      setTags((prev) => prev.slice(0, -1));
+    }
+  }
+
+  function removeTag(index: number) {
+    setTags((prev) => prev.filter((_, i) => i !== index));
+  }
 
   function toggleDay(day: number) {
     setHours((prev) =>
@@ -171,7 +192,7 @@ export default function BranchForm({
       .filter((h) => h.enabled)
       .map((h) => ({ dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }));
 
-    const tags = parsedTags;
+    const committedTags = tagInput.trim() ? [...tags, tagInput.trim()] : tags;
     const serviceIds = serviceIdsRaw.split(',').map((s) => s.trim()).filter(Boolean);
 
     const shared: UpdateBranchPayload = {
@@ -184,7 +205,7 @@ export default function BranchForm({
       lng: lng.trim() ? parseFloat(lng) : undefined,
       address: address.trim() || undefined,
       serviceIds: serviceIds.length > 0 ? serviceIds : undefined,
-      tags: tags.length > 0 ? tags : undefined,
+      tags: committedTags.length > 0 ? committedTags : undefined,
       workingHours: workingHours.length > 0 ? workingHours : undefined,
     };
 
@@ -410,22 +431,36 @@ export default function BranchForm({
 
         <div className={styles.field}>
           <label className={styles.fieldLabel}>Tags</label>
-          <input
-            type="text"
-            className={styles.textInput}
-            placeholder="e.g. emergency, 24h, cats, dogs"
-            value={tagsRaw}
-            onChange={(e) => setTagsRaw(e.target.value)}
-            disabled={saving || readOnly}
-          />
-          <p className={styles.fieldHint}>Separate tags with commas.</p>
-          {parsedTags.length > 0 && (
-            <div className={styles.tagList}>
-              {parsedTags.map((tag) => (
-                <span key={tag} className={styles.tag}>{tag}</span>
-              ))}
-            </div>
-          )}
+          <div className={`${styles.tagInputWrap} ${(saving || readOnly) ? styles.tagInputDisabled : ''}`}>
+            {tags.map((tag, i) => (
+              <span key={i} className={styles.tagChip}>
+                {tag}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className={styles.tagChipRemove}
+                    onClick={() => removeTag(i)}
+                    aria-label={`Remove ${tag}`}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+            {!readOnly && (
+              <input
+                type="text"
+                className={styles.tagChipInput}
+                placeholder={tags.length === 0 ? 'e.g. emergency, 24h, cats…' : 'Add tag…'}
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                onBlur={commitTag}
+                disabled={saving}
+              />
+            )}
+          </div>
+          {!readOnly && <p className={styles.fieldHint}>Press Enter or comma to add each tag. Backspace removes the last one.</p>}
         </div>
 
         <div className={styles.field}>
