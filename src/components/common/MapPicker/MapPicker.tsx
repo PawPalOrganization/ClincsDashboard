@@ -5,6 +5,24 @@ import styles from './MapPicker.module.scss';
 
 const MAPS_API_KEY = (import.meta as ImportMeta & { env: Record<string, string> }).env.VITE_GOOGLE_MAPS_API_KEY;
 const DEFAULT_CENTER = { lat: 30.0444, lng: 31.2357 }; // Cairo
+const PAW_MARKER_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <circle cx="32" cy="32" r="30" fill="#ffffff" stroke="#2563eb" stroke-width="4"/>
+  <ellipse cx="18" cy="22" rx="7" ry="9" fill="#2563eb"/>
+  <ellipse cx="32" cy="17" rx="7" ry="9" fill="#2563eb"/>
+  <ellipse cx="46" cy="22" rx="7" ry="9" fill="#2563eb"/>
+  <ellipse cx="24" cy="36" rx="6" ry="8" fill="#2563eb"/>
+  <ellipse cx="40" cy="36" rx="6" ry="8" fill="#2563eb"/>
+  <path d="M20 48c0-8 6-15 12-15s12 7 12 15c0 5-5 7-12 7s-12-2-12-7z" fill="#2563eb"/>
+</svg>`;
+
+function getPawMarkerIcon(): google.maps.Icon {
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(PAW_MARKER_SVG)}`,
+    scaledSize: new google.maps.Size(28, 28),
+    anchor: new google.maps.Point(14, 26),
+  };
+}
 
 interface MapPickerProps {
   lat: number | null;
@@ -22,7 +40,7 @@ export default function MapPicker({ lat, lng, onChange, disabled }: MapPickerPro
 
   const mapDivRef    = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<google.maps.Map | null>(null);
-  const markerRef    = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const markerRef    = useRef<google.maps.Marker | null>(null);
   const searchRef    = useRef<HTMLInputElement>(null);
   const initializedRef = useRef(false);
 
@@ -61,13 +79,12 @@ export default function MapPicker({ lat, lng, onChange, disabled }: MapPickerPro
       initializedRef.current = true;
 
       try {
-        const { Loader } = await import('@googlemaps/js-api-loader');
-        const loader = new Loader({ apiKey: MAPS_API_KEY, version: 'weekly' });
+        const { setOptions, importLibrary } = await import('@googlemaps/js-api-loader');
+        setOptions({ key: MAPS_API_KEY, v: 'weekly' });
 
-        const [mapsLib, markerLib, placesLib] = await Promise.all([
-          loader.importLibrary('maps'),
-          loader.importLibrary('marker'),
-          loader.importLibrary('places'),
+        const [mapsLib, placesLib] = await Promise.all([
+          importLibrary('maps'),
+          importLibrary('places'),
         ]);
 
         const center = (lat != null && lng != null)
@@ -77,7 +94,6 @@ export default function MapPicker({ lat, lng, onChange, disabled }: MapPickerPro
         const map = new mapsLib.Map(mapDivRef.current!, {
           center,
           zoom: lat != null ? 15 : 11,
-          mapId: 'PAWCLINICS_MAP',
           streetViewControl: false,
           fullscreenControl: false,
           mapTypeControl: false,
@@ -87,9 +103,10 @@ export default function MapPicker({ lat, lng, onChange, disabled }: MapPickerPro
 
         // Place existing marker if coords are set
         if (lat != null && lng != null) {
-          markerRef.current = new markerLib.AdvancedMarkerElement({
+          markerRef.current = new google.maps.Marker({
             map,
             position: { lat, lng },
+            icon: getPawMarkerIcon(),
           });
         }
 
@@ -100,11 +117,12 @@ export default function MapPicker({ lat, lng, onChange, disabled }: MapPickerPro
           const newLng = e.latLng.lng();
 
           if (markerRef.current) {
-            markerRef.current.position = e.latLng;
+            markerRef.current.setPosition(e.latLng);
           } else {
-            markerRef.current = new markerLib.AdvancedMarkerElement({
+            markerRef.current = new google.maps.Marker({
               map,
               position: e.latLng,
+              icon: getPawMarkerIcon(),
             });
           }
 
@@ -115,8 +133,10 @@ export default function MapPicker({ lat, lng, onChange, disabled }: MapPickerPro
         // Search box (Places Autocomplete)
         if (searchRef.current) {
           const autocomplete = new placesLib.Autocomplete(searchRef.current, {
+            componentRestrictions: { country: 'eg' },
             fields: ['geometry'],
           });
+
           autocomplete.addListener('place_changed', () => {
             const place = autocomplete.getPlace();
             if (!place.geometry?.location) return;
@@ -128,11 +148,12 @@ export default function MapPicker({ lat, lng, onChange, disabled }: MapPickerPro
             map.setZoom(16);
 
             if (markerRef.current) {
-              markerRef.current.position = place.geometry.location;
+              markerRef.current.setPosition(place.geometry.location);
             } else {
-              markerRef.current = new markerLib.AdvancedMarkerElement({
+              markerRef.current = new google.maps.Marker({
                 map,
                 position: place.geometry.location,
+                icon: getPawMarkerIcon(),
               });
             }
 
@@ -225,7 +246,7 @@ export default function MapPicker({ lat, lng, onChange, disabled }: MapPickerPro
               ref={searchRef}
               type="text"
               className={styles.searchInput}
-              placeholder="Search for an address or place…"
+              placeholder="Search for an address or place..."
             />
 
             {loadError ? (

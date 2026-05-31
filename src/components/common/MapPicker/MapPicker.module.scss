@@ -113,6 +113,10 @@
   }
 }
 
+:global(.pac-container) {
+  z-index: 10000;
+}
+
 .mapContainer {
   width: 100%;
   height: 420px;
