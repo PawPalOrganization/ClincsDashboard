@@ -48,6 +48,11 @@ export interface ClinicStaffRole {
 
 // ─── Staff ────────────────────────────────────────────────────────────────────
 
+export interface ClinicStaffClinic {
+  clinicId: number;
+  isOwner: boolean;
+}
+
 export interface ClinicStaff {
   id: string | number;
   firstName: string;
@@ -63,6 +68,8 @@ export interface ClinicStaff {
   permissions?: Array<ClinicStaffPermission | string>;
   clinicBranchId?: string | number;
   branches?: ClinicBranch[];
+  isOwner?: boolean;
+  clinics?: ClinicStaffClinic[];
 }
 
 // ─── Clinic ───────────────────────────────────────────────────────────────────
@@ -161,7 +168,8 @@ export interface UpdateBranchPayload {
 }
 
 // POST /clinic/api/clinic-staff
-// clinicBranchId must be a branch the requesting staff is assigned to
+// Non-owner: clinicBranchId required (clinic derived from branch)
+// Owner: isOwner: true + clinicId required; clinicBranchId ignored
 export interface CreateClinicStaffPayload {
   firstName: string;
   lastName: string;
@@ -172,7 +180,9 @@ export interface CreateClinicStaffPayload {
   yearsOfExperience?: number;
   joinedAt?: string;
   roleId?: string | number;
-  clinicBranchId: string | number;
+  clinicBranchId?: string | number;
+  isOwner?: boolean;
+  clinicId?: number;
 }
 
 // PUT /clinic/api/clinic-staff/:id

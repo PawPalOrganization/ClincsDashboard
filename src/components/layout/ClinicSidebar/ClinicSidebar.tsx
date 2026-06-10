@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../../context/ClinicAuthContext';
 import { hasClinicPermission } from '../../../utils/clinicPermissions';
 import type { ClinicPermissionSlug } from '../../../utils/clinicPermissions';
+import clinicProfileService from '../../../services/clinic/clinicProfileService';
+import type { Clinic } from '../../../types/clinic.types';
 import styles from './ClinicSidebar.module.scss';
 
 interface ClinicSidebarProps {
@@ -24,7 +27,26 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
-  const { staff, logout } = useClinicAuth();
+  const { staff, clinicId, logout } = useClinicAuth();
+  const [clinic, setClinic] = useState<Clinic | null>(null);
+
+  useEffect(() => {
+    if (!clinicId) return;
+    clinicProfileService.get(clinicId).then(setClinic).catch(() => {});
+  }, [clinicId]);
+
+  useEffect(() => {
+    document.title = clinic?.title ? `${clinic.title} | PawPal` : 'PawPal Clinics';
+    return () => { document.title = 'PawPal Clinics'; };
+  }, [clinic?.title]);
+
+  useEffect(() => {
+    const link = (document.querySelector("link[rel~='icon']") as HTMLLinkElement)
+      ?? Object.assign(document.createElement('link'), { rel: 'icon' });
+    if (!link.parentNode) document.head.appendChild(link);
+    link.href = clinic?.logoUrl ?? '/favicon.ico';
+    return () => { link.href = '/favicon.ico'; };
+  }, [clinic?.logoUrl]);
 
   const visibleNavItems = NAV_ITEMS.filter(
     (item) => !item.permission || hasClinicPermission(staff, item.permission),
@@ -57,8 +79,11 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
 
       {/* Logo */}
       <div className={styles.logo}>
-        <i className="bi bi-heart-pulse" />
-        <span>PawPal Clinics</span>
+        {clinic?.logoUrl
+          ? <img src={clinic.logoUrl} alt={clinic.title} className={styles.logoImg} />
+          : <i className="bi bi-heart-pulse" />
+        }
+        <span>{clinic?.title ?? 'PawPal Clinics'}</span>
       </div>
 
       {/* Main navigation */}
