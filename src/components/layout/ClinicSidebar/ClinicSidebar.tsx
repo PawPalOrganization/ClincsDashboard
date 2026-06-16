@@ -106,6 +106,8 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
         </ul>
       </nav>
 
+
+      
       {/* Bottom: profile card + logout */}
       <div className={styles.bottomSection}>
         <div className={styles.profileCard}>
