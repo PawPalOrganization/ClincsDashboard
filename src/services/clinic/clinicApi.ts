@@ -78,9 +78,17 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   if (!response.ok) {
-    const message =
-      (json as { message?: string }).message ??
-      `Request failed with status ${response.status}`;
+    const body = json as { message?: string | string[]; errors?: Record<string, string[]>; error?: string };
+    const rawMsg = body.message;
+    let message = Array.isArray(rawMsg)
+      ? rawMsg.join('; ')
+      : rawMsg ?? `Request failed with status ${response.status}`;
+    // Surface nested field-level validation errors (NestJS format)
+    if (body.errors && typeof body.errors === 'object') {
+      const details = Object.values(body.errors).flat().join('; ');
+      if (details) message = `${message}: ${details}`;
+    }
+    if (response.status >= 500) console.error('[API Error]', response.status, JSON.stringify(body));
     throw new ApiError(response.status, message);
   }
 
@@ -110,6 +118,15 @@ const clinicApi = {
   async put<T>(path: string, body?: unknown): Promise<T> {
     const response = await fetch(`${BASE_PATH}${path}`, {
       method: 'PUT',
+      headers: buildHeaders(),
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    return handleResponse<T>(response);
+  },
+
+  async patch<T>(path: string, body?: unknown): Promise<T> {
+    const response = await fetch(`${BASE_PATH}${path}`, {
+      method: 'PATCH',
       headers: buildHeaders(),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });

@@ -11,6 +11,7 @@ export interface PaginationMeta {
   page: number;
   limit: number;
   totalPages: number;
+  unreadCount?: number;
 }
 
 export interface PaginatedList<T> {
@@ -70,6 +71,7 @@ export interface ClinicStaff {
   branches?: ClinicBranch[];
   isOwner?: boolean;
   clinics?: ClinicStaffClinic[];
+  workingHours?: BranchWorkingHour[];
 }
 
 // ─── Clinic ───────────────────────────────────────────────────────────────────
@@ -108,17 +110,23 @@ export interface ClinicBranch {
   lat?: number;
   lng?: number;
   address?: string;
-  serviceIds?: Array<string | number | ClinicService>;
+  services?: BranchService[];
   tags?: Array<string | number | { id?: string | number; name?: string; title?: string }>;
   workingHours?: BranchWorkingHour[];
 }
 
-// ─── Services (dropdown) ──────────────────────────────────────────────────────
+// ─── Services ─────────────────────────────────────────────────────────────────
+
+export interface BranchService {
+  clinicServiceId: number;
+  cost: number;
+}
 
 export interface ClinicService {
-  id: string;
+  id: string | number;
   name: string;
   description?: string;
+  logoUrl?: string;
 }
 
 // ─── Request payloads ─────────────────────────────────────────────────────────
@@ -146,7 +154,7 @@ export interface CreateBranchPayload {
   lat?: number;
   lng?: number;
   address?: string;
-  serviceIds?: string[];
+  services?: BranchService[];
   tags?: string[];
   workingHours?: BranchWorkingHour[];
 }
@@ -162,7 +170,7 @@ export interface UpdateBranchPayload {
   lat?: number;
   lng?: number;
   address?: string;
-  serviceIds?: string[];
+  services?: BranchService[];
   tags?: string[];
   workingHours?: BranchWorkingHour[];
 }
@@ -183,6 +191,7 @@ export interface CreateClinicStaffPayload {
   clinicBranchId?: string | number;
   isOwner?: boolean;
   clinicId?: number;
+  workingHours?: BranchWorkingHour[];
 }
 
 // PUT /clinic/api/clinic-staff/:id
@@ -197,10 +206,114 @@ export interface UpdateClinicStaffPayload {
   yearsOfExperience?: number;
   joinedAt?: string;
   roleId?: string | number;
+  workingHours?: BranchWorkingHour[];
 }
 
 // PUT /clinic/api/clinic-staff/:id/assignments
 // Sends the full replacement list — not a partial update
 export interface UpdateStaffAssignmentsPayload {
   clinicBranchIds: Array<string | number>;
+}
+
+// ─── Appointments ─────────────────────────────────────────────────────────────
+
+export type AppointmentStatus = 'reserved' | 'finished' | 'cancelled';
+
+export interface AppointmentService {
+  clinicServiceId: number;
+  name?: string;
+  cost: number;
+}
+
+export interface AppointmentDoctor {
+  id: string | number;
+  firstName: string;
+  lastName: string;
+  role?: { name: string };
+}
+
+export interface Appointment {
+  id: string | number;
+  clinicBranchId: string | number;
+  clinicStaffId: string | number;
+  userId?: string | number;
+  petId?: string | number;
+  contactName?: string;
+  contactPhone?: string;
+  contactAddress?: string;
+  scheduledAt: string;
+  timezone?: string;
+  status: AppointmentStatus;
+  notes?: string;
+  doctor?: AppointmentDoctor;
+  services: AppointmentService[];
+  totalCost: number;
+  visitorOrder?: number;
+  cancellationReason?: string;
+  branch?: { id: string | number; title: string };
+}
+
+export interface CreateAppointmentPayload {
+  clinicBranchId: string | number;
+  clinicStaffId: string | number;
+  clinicServiceIds?: Array<string | number>;
+  userId?: string | number;
+  petId?: string | number;
+  contactName?: string;
+  contactPhone?: string;
+  contactAddress?: string;
+  scheduledAt: string;
+  timezone?: string;
+  notes?: string;
+}
+
+export interface UpdateAppointmentPayload {
+  clinicStaffId?: string | number;
+  clinicServiceIds?: Array<string | number>;
+  contactName?: string;
+  contactPhone?: string;
+  contactAddress?: string;
+  scheduledAt?: string;
+  timezone?: string;
+  notes?: string;
+}
+
+export interface AppointmentStats {
+  numOfCancellationsUserSide: number;
+  numOfCancellationsClinicSide: number;
+  numOfVisitors: number;
+  numOfTransactions: number;
+}
+
+export interface AppointmentListParams {
+  page?: number;
+  limit?: number;
+  branchId?: string | number;
+  date?: string;
+  status?: AppointmentStatus;
+  clinicStaffId?: string | number;
+  clinicServiceId?: string | number;
+  phone?: string;
+  name?: string;
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export interface ClinicNotification {
+  id: string | number;
+  title: string;
+  body: string;
+  type?: string;
+  isRead: boolean;
+  createdAt: string;
+  branchId?: string | number;
+}
+
+// ─── User search (for appointment booking) ───────────────────────────────────
+
+export interface UserSearchResult {
+  id: string | number;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string;
 }

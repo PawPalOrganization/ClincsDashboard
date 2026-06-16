@@ -1,0 +1,567 @@
+// Appointments pages — uses the same design tokens as the rest of the portal
+
+.page {
+  padding: 1.5rem 1.75rem;
+  max-width: 1200px;
+
+  @media (max-width: 700px) {
+    padding: 1rem;
+  }
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1a1d2e;
+  margin: 0 0 0.2rem;
+}
+
+.pageSubtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.feedbackAlert {
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+}
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+
+  > i {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9ca3af;
+    font-size: 0.9rem;
+    pointer-events: none;
+  }
+}
+
+.searchInput {
+  width: 100%;
+  padding: 0.5rem 2.25rem 0.5rem 2.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #111827;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary, #0d9aff);
+    box-shadow: 0 0 0 3px rgba(13, 154, 255, 0.1);
+  }
+
+  &::placeholder { color: #9ca3af; }
+}
+
+.clearSearch {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0.2rem;
+  border-radius: 4px;
+
+  &:hover { color: #374151; }
+}
+
+.filterSelect {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+  min-width: 150px;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary, #0d9aff);
+  }
+
+  &:disabled {
+    background: #f9fafb;
+    cursor: not-allowed;
+  }
+}
+
+.filterDate {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary, #0d9aff);
+  }
+}
+
+// ─── Status badges ────────────────────────────────────────────────────────────
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.statusReserved {
+  color: #0369a1;
+  background: #e0f2fe;
+}
+
+.statusFinished {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.statusCancelled {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+// ─── Cell text helpers ────────────────────────────────────────────────────────
+
+.cellText {
+  font-size: 0.875rem;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+
+  i { color: #9ca3af; font-size: 0.8rem; }
+}
+
+.noData {
+  color: #d1d5db;
+  font-size: 0.875rem;
+}
+
+.costCell {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.serviceList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.servicePill {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #e4e7ec;
+  white-space: nowrap;
+}
+
+.serviceMore {
+  font-size: 0.72rem;
+  color: #9ca3af;
+}
+
+.doctorCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+
+  span { font-size: 0.875rem; color: #111827; font-weight: 500; }
+  small { font-size: 0.75rem; color: #9ca3af; }
+}
+
+// ─── Access / error states ────────────────────────────────────────────────────
+
+.noClinic,
+.accessDenied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  gap: 0.75rem;
+  color: #6b7280;
+
+  i { font-size: 2.5rem; color: #d1d5db; }
+  h2 { font-size: 1.1rem; font-weight: 700; color: #374151; margin: 0; }
+  p { margin: 0; font-size: 0.9rem; }
+}
+
+// ─── Today's Queue ────────────────────────────────────────────────────────────
+
+.queueGrid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.queueCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e4e7ec;
+  border-radius: 0.75rem;
+  background: #fff;
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: rgba(13, 154, 255, 0.3);
+  }
+}
+
+.queueOrder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(13, 154, 255, 0.08);
+  color: var(--color-primary, #0d9aff);
+  font-weight: 700;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.queueInfo {
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  span {
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+}
+
+.queueActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.queueActionBtn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+  }
+
+  &.finish {
+    border-color: #86efac;
+    color: #15803d;
+    background: #f0fdf4;
+
+    &:hover { background: #dcfce7; }
+  }
+
+  &.cancel {
+    border-color: #fca5a5;
+    color: #b91c1c;
+    background: #fff5f5;
+
+    &:hover { background: #fee2e2; }
+  }
+}
+
+// ─── Appointment detail ───────────────────────────────────────────────────────
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+
+  @media (max-width: 700px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detailCard {
+  border: 1px solid #e4e7ec;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 1.25rem;
+}
+
+.detailCardTitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0 0 1rem;
+}
+
+.detailRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.875rem;
+
+  &:last-child { margin-bottom: 0; }
+
+  label {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    font-weight: 500;
+  }
+
+  span {
+    font-size: 0.875rem;
+    color: #111827;
+  }
+}
+
+.detailActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+// ─── Create Appointment stepper ───────────────────────────────────────────────
+
+.stepper {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.75rem;
+  border-bottom: 2px solid #e4e7ec;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem 0.6rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #9ca3af;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+}
+
+.stepActive {
+  color: var(--color-primary, #0d9aff);
+  border-bottom-color: var(--color-primary, #0d9aff);
+}
+
+.stepDone {
+  color: #15803d;
+}
+
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: #9ca3af;
+  flex-shrink: 0;
+
+  .stepActive & {
+    background: var(--color-primary, #0d9aff);
+    color: #fff;
+  }
+
+  .stepDone & {
+    background: #dcfce7;
+    color: #15803d;
+  }
+}
+
+.stepCard {
+  border: 1px solid #e4e7ec;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.stepCardTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 1.25rem;
+}
+
+.stepNav {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.userSearchResults {
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #fff;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+
+.userSearchItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.1s;
+
+  &:last-child { border-bottom: none; }
+
+  &:hover { background: #f8fbff; }
+}
+
+.userSearchAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(13, 154, 255, 0.1);
+  color: var(--color-primary, #0d9aff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.userSearchName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.userSearchPhone {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.walkInToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  cursor: pointer;
+  margin-top: 0.75rem;
+
+  input { accent-color: var(--color-primary, #0d9aff); }
+}
+
+.serviceCheckList {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.serviceCheckItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+
+  input { accent-color: var(--color-primary, #0d9aff); width: 16px; height: 16px; }
+
+  &.checked {
+    border-color: rgba(13, 154, 255, 0.4);
+    background: rgba(13, 154, 255, 0.03);
+  }
+}
+
+.serviceCheckName {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.serviceCheckCost {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-top: 1px solid #e4e7ec;
+  margin-top: 0.5rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #111827;
+}

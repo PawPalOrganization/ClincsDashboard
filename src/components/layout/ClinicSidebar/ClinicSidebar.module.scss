@@ -121,6 +121,161 @@
   font-size: 1.05rem;
 }
 
+// ─── Notification bell ────────────────────────────────────────────────────────
+
+.bellWrap {
+  position: relative;
+  padding: 0 0.75rem 0.25rem;
+}
+
+.bellBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 0.875rem;
+  background: none;
+  border: none;
+  color: #b8bcc8;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease;
+  text-align: left;
+
+  i { font-size: 1rem; }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+  }
+}
+
+.bellIconWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bellBadge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  background: #ef4444;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  border-radius: 10px;
+  line-height: 1;
+}
+
+.notifDropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #252838;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  z-index: 200;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.notifHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.875rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: white;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.notifUnreadBadge {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  font-size: 0.68rem;
+  font-weight: 500;
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+}
+
+.notifEmpty {
+  padding: 1.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.notifList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.notifItem {
+  position: relative;
+  padding: 0.65rem 0.875rem 0.65rem 0.875rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: default;
+  transition: background 0.1s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: rgba(255, 255, 255, 0.03); }
+}
+
+.notifItemUnread {
+  background: rgba(13, 154, 255, 0.07);
+  cursor: pointer;
+  padding-right: 1.5rem;
+
+  &:hover { background: rgba(13, 154, 255, 0.12); }
+}
+
+.notifTitle {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin-bottom: 0.2rem;
+  line-height: 1.3;
+}
+
+.notifBody {
+  font-size: 0.74rem;
+  color: #9ca3af;
+  line-height: 1.4;
+  margin-bottom: 0.3rem;
+}
+
+.notifTime {
+  font-size: 0.67rem;
+  color: #6b7280;
+}
+
+.notifDot {
+  position: absolute;
+  top: 50%;
+  right: 0.6rem;
+  transform: translateY(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0d9aff;
+  flex-shrink: 0;
+}
+
 // ─── Bottom section ───────────────────────────────────────────────────────────
 
 .bottomSection {

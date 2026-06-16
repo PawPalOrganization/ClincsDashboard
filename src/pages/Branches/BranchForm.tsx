@@ -4,6 +4,7 @@ import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
 import MapPicker from '../../components/common/MapPicker/MapPicker';
 import type {
+  BranchService,
   BranchWorkingHour,
   ClinicBranch,
   CreateBranchPayload,
@@ -23,9 +24,14 @@ export interface BranchFormInitialValues {
   lat?: number;
   lng?: number;
   address?: string;
-  serviceIds?: ClinicBranch['serviceIds'];
+  services?: ClinicBranch['services'];
   tags?: ClinicBranch['tags'];
   workingHours?: BranchWorkingHour[];
+}
+
+interface ServiceRow {
+  clinicServiceId: string;
+  cost: string;
 }
 
 interface HourEntry {
@@ -48,15 +54,20 @@ interface BranchFormProps {
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-type DisplayItem = string | number | { id?: string | number; name?: string; title?: string };
+type TagItem = string | number | { id?: string | number; name?: string; title?: string };
 
-function displayItemLabel(item: DisplayItem): string {
+function tagItemLabel(item: TagItem): string {
   if (typeof item === 'string' || typeof item === 'number') return String(item);
   return item.name ?? item.title ?? (item.id != null ? String(item.id) : '');
 }
 
-function displayItemsToRaw(items?: DisplayItem[]): string {
-  return items?.map(displayItemLabel).filter(Boolean).join(', ') ?? '';
+function buildDefaultServices(services?: BranchService[]): ServiceRow[] {
+  return (services ?? [])
+    .filter((s) => s.clinicServiceId != null && s.clinicServiceId > 0)
+    .map((s) => ({
+      clinicServiceId: String(s.clinicServiceId),
+      cost: String(s.cost),
+    }));
 }
 
 function parseAddressParts(address?: string): { city: string; area: string; street: string } {
@@ -95,16 +106,16 @@ export default function BranchForm({
   const [isMainBranch, setIsMainBranch] = useState(defaultValues?.isMainBranch ?? false);
   const [isActive, setIsActive]       = useState(defaultValues?.isActive ?? true);
   const [phoneNumber, setPhoneNumber] = useState(defaultValues?.phoneNumber ?? '');
-  const [lat, setLat]                 = useState<number | null>(defaultValues?.lat ?? null);
-  const [lng, setLng]                 = useState<number | null>(defaultValues?.lng ?? null);
+  const [lat, setLat]                 = useState<number | null>(defaultValues?.lat != null ? Number(defaultValues.lat) : null);
+  const [lng, setLng]                 = useState<number | null>(defaultValues?.lng != null ? Number(defaultValues.lng) : null);
   const [addressCity, setAddressCity]   = useState(() => parseAddressParts(defaultValues?.address).city);
   const [addressArea, setAddressArea]   = useState(() => parseAddressParts(defaultValues?.address).area);
   const [addressStreet, setAddressStreet] = useState(() => parseAddressParts(defaultValues?.address).street);
   const [tags, setTags]               = useState<string[]>(() =>
-    (defaultValues?.tags ?? []).map(displayItemLabel).filter(Boolean),
+    (defaultValues?.tags ?? []).map(tagItemLabel).filter(Boolean),
   );
   const [tagInput, setTagInput]       = useState('');
-  const [serviceIdsRaw, setServiceIdsRaw] = useState(displayItemsToRaw(defaultValues?.serviceIds));
+  const [services, setServices]       = useState<ServiceRow[]>(() => buildDefaultServices(defaultValues?.services));
   const [hours, setHours]             = useState<HourEntry[]>(() => buildDefaultHours(defaultValues?.workingHours));
 
   const [titleError, setTitleError] = useState('');
@@ -118,14 +129,14 @@ export default function BranchForm({
     setIsMainBranch(defaultValues.isMainBranch ?? false);
     setIsActive(defaultValues.isActive ?? true);
     setPhoneNumber(defaultValues.phoneNumber ?? '');
-    setLat(defaultValues.lat ?? null);
-    setLng(defaultValues.lng ?? null);
+    setLat(defaultValues.lat != null ? Number(defaultValues.lat) : null);
+    setLng(defaultValues.lng != null ? Number(defaultValues.lng) : null);
     const addrParts = parseAddressParts(defaultValues.address);
     setAddressCity(addrParts.city);
     setAddressArea(addrParts.area);
     setAddressStreet(addrParts.street);
-    setTags((defaultValues.tags ?? []).map(displayItemLabel).filter(Boolean));
-    setServiceIdsRaw(displayItemsToRaw(defaultValues.serviceIds));
+    setTags((defaultValues.tags ?? []).map(tagItemLabel).filter(Boolean));
+    setServices(buildDefaultServices(defaultValues.services));
     setHours(buildDefaultHours(defaultValues.workingHours));
   }, [defaultValues]);
 
@@ -148,6 +159,18 @@ export default function BranchForm({
 
   function removeTag(index: number) {
     setTags((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addServiceRow() {
+    setServices((prev) => [...prev, { clinicServiceId: '', cost: '' }]);
+  }
+
+  function updateServiceRow(index: number, field: 'clinicServiceId' | 'cost', value: string) {
+    setServices((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
+  }
+
+  function removeServiceRow(index: number) {
+    setServices((prev) => prev.filter((_, i) => i !== index));
   }
 
   function toggleDay(day: number) {
@@ -181,7 +204,13 @@ export default function BranchForm({
       .map((h) => ({ dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }));
 
     const committedTags = tagInput.trim() ? [...tags, tagInput.trim()] : tags;
-    const serviceIds = serviceIdsRaw.split(',').map((s) => s.trim()).filter(Boolean);
+
+    const builtServices: BranchService[] = services
+      .filter((s) => s.clinicServiceId.trim() !== '')
+      .map((s) => ({
+        clinicServiceId: parseInt(s.clinicServiceId, 10),
+        cost: parseFloat(s.cost) || 0,
+      }));
 
     const shared: UpdateBranchPayload = {
       title: title.trim(),
@@ -192,7 +221,7 @@ export default function BranchForm({
       lat: lat ?? undefined,
       lng: lng ?? undefined,
       address: [addressStreet, addressArea, addressCity].map((p) => p.trim()).filter(Boolean).join(', ') || undefined,
-      serviceIds: serviceIds.length > 0 ? serviceIds : undefined,
+      services: builtServices.length > 0 ? builtServices : undefined,
       tags: committedTags.length > 0 ? committedTags : undefined,
       workingHours: workingHours.length > 0 ? workingHours : undefined,
     };
@@ -458,19 +487,53 @@ export default function BranchForm({
         </div>
 
         <div className={styles.field}>
-          <label className={styles.fieldLabel}>Service IDs</label>
-          <input
-            type="text"
-            className={styles.textInput}
-            placeholder="e.g. uuid-1, uuid-2"
-            value={serviceIdsRaw}
-            onChange={(e) => setServiceIdsRaw(e.target.value)}
-            disabled={saving || readOnly}
-          />
+          <label className={styles.fieldLabel}>Services & Pricing</label>
+          {services.map((row, index) => (
+            <div key={index} className={styles.serviceRow}>
+              <input
+                type="number"
+                className={styles.serviceIdInput}
+                placeholder="Service ID"
+                min={1}
+                value={row.clinicServiceId}
+                onChange={(e) => updateServiceRow(index, 'clinicServiceId', e.target.value)}
+                disabled={saving || readOnly}
+              />
+              <input
+                type="number"
+                className={styles.serviceCostInput}
+                placeholder="Cost"
+                min={0}
+                step="0.01"
+                value={row.cost}
+                onChange={(e) => updateServiceRow(index, 'cost', e.target.value)}
+                disabled={saving || readOnly}
+              />
+              {!readOnly && (
+                <button
+                  type="button"
+                  className={styles.serviceRowRemove}
+                  onClick={() => removeServiceRow(index)}
+                  aria-label="Remove service"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
+          {!readOnly && (
+            <button
+              type="button"
+              className={styles.addServiceBtn}
+              onClick={addServiceRow}
+              disabled={saving}
+            >
+              <i className="bi bi-plus-circle" /> Add Service
+            </button>
+          )}
           <p className={styles.fieldHint}>
             <i className="bi bi-info-circle" />
-            {' '}Service selection is unavailable in the clinic portal — enter IDs manually if known.
-            {/* TODO: Replace with service picker when GET /clinic/api/services is available */}
+            {' '}Service IDs are assigned by your admin in the admin dashboard. Ask your admin for the correct ID before adding a service here.
           </p>
         </div>
       </div>

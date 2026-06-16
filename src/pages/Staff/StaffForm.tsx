@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
 import type {
+  BranchWorkingHour,
   ClinicBranch,
   ClinicStaff,
   ClinicStaffRole,
@@ -42,6 +43,28 @@ function dateInputValue(value?: string): string {
   return date.toISOString().slice(0, 10);
 }
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+interface HourEntry {
+  dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+function buildHoursState(workingHours?: BranchWorkingHour[]): HourEntry[] {
+  return (Array.from({ length: 7 }) as undefined[]).map((_, i) => {
+    const day = i as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    const found = workingHours?.find((h) => h.dayOfWeek === day);
+    return {
+      dayOfWeek: day,
+      enabled: !!found,
+      startTime: found?.startTime ?? '09:00',
+      endTime: found?.endTime ?? '17:00',
+    };
+  });
+}
+
 export default function StaffForm({
   mode,
   defaultValues,
@@ -72,6 +95,19 @@ export default function StaffForm({
   );
   const [joinedAt, setJoinedAt] = useState(dateInputValue(defaultValues?.joinedAt));
   const [errors, setErrors] = useState<FormErrors>({});
+  const [hours, setHours] = useState<HourEntry[]>(() => buildHoursState(defaultValues?.workingHours));
+
+  function toggleDay(dayOfWeek: number) {
+    setHours((prev) =>
+      prev.map((h) => (h.dayOfWeek === dayOfWeek ? { ...h, enabled: !h.enabled } : h)),
+    );
+  }
+
+  function updateHour(dayOfWeek: number, field: 'startTime' | 'endTime', value: string) {
+    setHours((prev) =>
+      prev.map((h) => (h.dayOfWeek === dayOfWeek ? { ...h, [field]: value } : h)),
+    );
+  }
 
   useEffect(() => {
     if (!defaultValues) return;
@@ -90,6 +126,7 @@ export default function StaffForm({
       defaultValues.yearsOfExperience != null ? String(defaultValues.yearsOfExperience) : '',
     );
     setJoinedAt(dateInputValue(defaultValues.joinedAt));
+    setHours(buildHoursState(defaultValues.workingHours));
   }, [defaultValues]);
 
   function clearError(name: keyof FormErrors) {
@@ -130,6 +167,10 @@ export default function StaffForm({
     e.preventDefault();
     if (!validate()) return;
 
+    const builtHours: BranchWorkingHour[] = hours
+      .filter((h) => h.enabled)
+      .map((h) => ({ dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }));
+
     const shared = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
@@ -138,6 +179,7 @@ export default function StaffForm({
       password: password.trim() || undefined,
       gender: gender ? (gender as 'male' | 'female' | 'other') : undefined,
       roleId: roleId || undefined,
+      workingHours: builtHours.length > 0 ? builtHours : undefined,
     };
 
     const payload: StaffFormPayload =
@@ -372,6 +414,59 @@ export default function StaffForm({
           />
         </div>
       )}
+
+      {/* ── Working Hours ── */}
+      <div className={styles.card}>
+        <div className={styles.cardHeader}>
+          <h2 className={styles.sectionTitle}>
+            <i className="bi bi-clock" /> Working Hours
+          </h2>
+          <p className={styles.sectionDesc}>
+            Availability schedule used for appointment booking.
+          </p>
+        </div>
+
+        <div className={styles.hoursTable}>
+          {hours.map((entry) => (
+            <div
+              key={entry.dayOfWeek}
+              className={`${styles.dayRow} ${entry.enabled ? styles.dayRowActive : ''}`}
+            >
+              <label className={styles.dayCheck}>
+                <input
+                  type="checkbox"
+                  checked={entry.enabled}
+                  onChange={() => toggleDay(entry.dayOfWeek)}
+                  disabled={saving || readOnly}
+                />
+                <span className={styles.dayName}>{DAY_NAMES[entry.dayOfWeek]}</span>
+              </label>
+
+              {entry.enabled ? (
+                <div className={styles.timeInputs}>
+                  <input
+                    type="time"
+                    className={styles.timeInput}
+                    value={entry.startTime}
+                    onChange={(e) => updateHour(entry.dayOfWeek, 'startTime', e.target.value)}
+                    disabled={saving || readOnly}
+                  />
+                  <span className={styles.timeSep}>to</span>
+                  <input
+                    type="time"
+                    className={styles.timeInput}
+                    value={entry.endTime}
+                    onChange={(e) => updateHour(entry.dayOfWeek, 'endTime', e.target.value)}
+                    disabled={saving || readOnly}
+                  />
+                </div>
+              ) : (
+                <span className={styles.dayClosed}>Closed</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
       {childrenBeforeSubmit}
 

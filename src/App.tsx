@@ -13,6 +13,13 @@ import EditBranch from './pages/Branches/EditBranch';
 import StaffList from './pages/Staff/StaffList';
 import CreateStaff from './pages/Staff/CreateStaff';
 import EditStaff from './pages/Staff/EditStaff';
+import DoctorList from './pages/Staff/DoctorList';
+import CreateDoctor from './pages/Staff/CreateDoctor';
+import DoctorInfo from './pages/Staff/DoctorInfo';
+import AppointmentsList from './pages/Appointments/AppointmentsList';
+import TodayQueue from './pages/Appointments/TodayQueue';
+import CreateAppointment from './pages/Appointments/CreateAppointment';
+import AppointmentDetail from './pages/Appointments/AppointmentDetail';
 
 // ─── Root redirect ─────────────────────────────────────────────────────────
 // Reads auth state and sends the user to the right place.
@@ -92,7 +99,14 @@ export default function App() {
               <Route path="/branches/:branchId"  element={<EditBranch />} />
               <Route path="/staff"               element={<StaffList />} />
               <Route path="/staff/create"        element={<CreateStaff />} />
+              <Route path="/staff/doctors"          element={<DoctorList />} />
+              <Route path="/staff/doctors/create"   element={<CreateDoctor />} />
+              <Route path="/staff/doctors/:staffId" element={<DoctorInfo />} />
               <Route path="/staff/:staffId"      element={<EditStaff />} />
+              <Route path="/appointments"          element={<AppointmentsList />} />
+              <Route path="/appointments/today"  element={<TodayQueue />} />
+              <Route path="/appointments/create" element={<CreateAppointment />} />
+              <Route path="/appointments/:id"    element={<AppointmentDetail />} />
               <Route path="/settings"            element={<ClinicSettings />} />
             </Route>
           </Route>

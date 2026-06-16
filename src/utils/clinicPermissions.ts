@@ -20,7 +20,11 @@ export type ClinicPermissionSlug =
   | 'clinic-staff.delete'
   | 'clinic-staff.assignments'
   | 'clinic-staff-roles.read'
-  | 'clinic-staff-roles.update';
+  | 'clinic-staff-roles.update'
+  | 'appointments.read'
+  | 'appointments.create'
+  | 'appointments.update'
+  | 'appointments.cancel';
 
 const PRIVILEGED_ROLE_WORDS = ['owner'];
 

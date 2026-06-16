@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../../context/ClinicAuthContext';
 import { hasClinicPermission } from '../../../utils/clinicPermissions';
 import type { ClinicPermissionSlug } from '../../../utils/clinicPermissions';
 import clinicProfileService from '../../../services/clinic/clinicProfileService';
-import type { Clinic } from '../../../types/clinic.types';
+import clinicNotificationService from '../../../services/clinic/clinicNotificationService';
+import type { Clinic, ClinicNotification } from '../../../types/clinic.types';
 import styles from './ClinicSidebar.module.scss';
 
 interface ClinicSidebarProps {
@@ -20,15 +21,61 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { path: '/dashboard', icon: 'bi-grid',     label: 'Dashboard' },
-  { path: '/branches',  icon: 'bi-building', label: 'Branches',  permission: 'clinic-branches.read' },
-  { path: '/staff',     icon: 'bi-people',   label: 'Staff',     permission: 'clinic-staff.read'    },
-  { path: '/settings',  icon: 'bi-gear',     label: 'Settings',  permission: 'clinics.read'         },
+  { path: '/dashboard',    icon: 'bi-grid',            label: 'Dashboard'    },
+  { path: '/branches',     icon: 'bi-building',        label: 'Branches',     permission: 'clinic-branches.read'  },
+  { path: '/appointments', icon: 'bi-calendar-check',  label: 'Appointments', permission: 'appointments.read'     },
+  { path: '/staff',        icon: 'bi-people',          label: 'Staff',        permission: 'clinic-staff.read'     },
+  { path: '/settings',     icon: 'bi-gear',            label: 'Settings',     permission: 'clinics.read'          },
 ];
 
 export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
   const { staff, clinicId, logout } = useClinicAuth();
   const [clinic, setClinic] = useState<Clinic | null>(null);
+
+  // ── Notifications ──────────────────────────────────────────────────────────
+  const [notifications, setNotifications] = useState<ClinicNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [bellOpen, setBellOpen] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
+
+  async function loadNotifications() {
+    try {
+      const res = await clinicNotificationService.list({ limit: 10 });
+      setNotifications(res.items);
+      setUnreadCount(
+        res.meta.unreadCount ?? res.items.filter((n) => !n.isRead).length,
+      );
+    } catch {}
+  }
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!bellOpen) return;
+    function handleOutside(e: MouseEvent) {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setBellOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [bellOpen]);
+
+  async function handleMarkRead(id: string | number) {
+    try {
+      await clinicNotificationService.markRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {}
+  }
+
+  // ── Clinic profile ─────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!clinicId) return;
@@ -108,6 +155,62 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
 
 
       
+      {/* Notification bell */}
+      <div ref={bellRef} className={styles.bellWrap}>
+        <button
+          className={styles.bellBtn}
+          onClick={() => setBellOpen((prev) => !prev)}
+          aria-label="Notifications"
+        >
+          <span className={styles.bellIconWrap}>
+            <i className="bi bi-bell" />
+            {unreadCount > 0 && (
+              <span className={styles.bellBadge}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </span>
+          <span>Notifications</span>
+        </button>
+
+        {bellOpen && (
+          <div className={styles.notifDropdown}>
+            <div className={styles.notifHeader}>
+              <span>Notifications</span>
+              {unreadCount > 0 && (
+                <span className={styles.notifUnreadBadge}>{unreadCount} unread</span>
+              )}
+            </div>
+
+            {notifications.length === 0 ? (
+              <p className={styles.notifEmpty}>No notifications yet</p>
+            ) : (
+              <ul className={styles.notifList}>
+                {notifications.map((n) => (
+                  <li
+                    key={String(n.id)}
+                    className={`${styles.notifItem} ${!n.isRead ? styles.notifItemUnread : ''}`}
+                    onClick={() => { if (!n.isRead) handleMarkRead(n.id); }}
+                  >
+                    <div className={styles.notifTitle}>{n.title}</div>
+                    <div className={styles.notifBody}>{n.body}</div>
+                    <div className={styles.notifTime}>
+                      {new Intl.DateTimeFormat(undefined, {
+                        month: 'short', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                      }).format(new Date(n.createdAt))}
+                    </div>
+                    {!n.isRead && (
+                      <span className={styles.notifDot} aria-label="Unread" />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Bottom: profile card + logout */}
       <div className={styles.bottomSection}>
         <div className={styles.profileCard}>

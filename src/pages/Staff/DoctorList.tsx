@@ -2,10 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
-import clinicStaffRolesService from '../../services/clinic/clinicStaffRolesService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
 import { hasAnyClinicPermission, hasClinicPermission } from '../../utils/clinicPermissions';
-import type { ClinicBranch, ClinicStaff, ClinicStaffRole } from '../../types/clinic.types';
+import type { ClinicBranch, ClinicStaff } from '../../types/clinic.types';
 import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
 import Button from '../../components/common/Button/Button';
@@ -14,14 +13,22 @@ import TablePageSkeleton from '../../components/common/Skeleton/TablePageSkeleto
 import TabBar from '../../components/common/TabBar/TabBar';
 import styles from './Staff.module.scss';
 
+type StaffRow = ClinicStaff & Record<string, unknown>;
+
+const LIMIT = 10;
+
 const STAFF_TABS = [
   { label: 'Staff', to: '/staff' },
   { label: 'Doctors', to: '/staff/doctors' },
 ];
 
-type StaffRow = ClinicStaff & Record<string, unknown>;
+const DOCTOR_ROLE_KEYWORDS = ['doctor', 'vet', 'physician', 'surgeon', 'specialist'];
 
-const LIMIT = 10;
+function isDoctorRole(roleName?: string): boolean {
+  if (!roleName) return false;
+  const lower = roleName.toLowerCase();
+  return DOCTOR_ROLE_KEYWORDS.some((kw) => lower.includes(kw));
+}
 
 function formatDate(value?: string): string {
   if (!value) return '';
@@ -38,14 +45,13 @@ function fullName(member: ClinicStaff): string {
   return [member.firstName, member.lastName].filter(Boolean).join(' ') || 'Unnamed staff';
 }
 
-export default function StaffList() {
+export default function DoctorList() {
   const { clinicId, staff: authStaff } = useClinicAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const successMsg = (location.state as { successMsg?: string } | null)?.successMsg ?? '';
 
   const [staff, setStaff] = useState<StaffRow[]>([]);
-  const [roles, setRoles] = useState<ClinicStaffRole[]>([]);
   const [branches, setBranches] = useState<ClinicBranch[]>([]);
 
   const [search, setSearch] = useState('');
@@ -60,7 +66,6 @@ export default function StaffList() {
   const [hasLoadedStaff, setHasLoadedStaff] = useState(false);
   const [loadingFilters, setLoadingFilters] = useState(true);
   const [staffError, setStaffError] = useState('');
-  const [rolesError, setRolesError] = useState('');
   const [branchesError, setBranchesError] = useState('');
 
   const canViewStaff = hasClinicPermission(authStaff, 'clinic-staff.read');
@@ -69,14 +74,7 @@ export default function StaffList() {
     'clinic-staff.update',
     'clinic-staff.assignments',
   ]);
-  const canLoadRoles    = hasClinicPermission(authStaff, 'clinic-staff-roles.read');
   const canLoadBranches = hasClinicPermission(authStaff, 'clinic-branches.read');
-
-  const roleById = useMemo(() => {
-    const map = new Map<string, string>();
-    roles.forEach((role) => map.set(String(role.id), role.name));
-    return map;
-  }, [roles]);
 
   const branchById = useMemo(() => {
     const map = new Map<string, ClinicBranch>();
@@ -89,7 +87,6 @@ export default function StaffList() {
       setDebouncedSearch(search.trim());
       setPage(1);
     }, 300);
-
     return () => window.clearTimeout(timer);
   }, [search]);
 
@@ -98,40 +95,26 @@ export default function StaffList() {
   }, [selectedBranchId]);
 
   useEffect(() => {
-    if (!clinicId || !canViewStaff) {
+    if (!clinicId || !canViewStaff || !canLoadBranches) {
       setLoadingFilters(false);
       return;
     }
 
     async function loadFilters() {
       setLoadingFilters(true);
-      setRolesError('');
       setBranchesError('');
-
-      const SKIP = Promise.resolve(null);
-
-      const [rolesRes, branchesRes] = await Promise.allSettled([
-        canLoadRoles    ? clinicStaffRolesService.list() : SKIP,
-        canLoadBranches ? clinicBranchesService.list(clinicId!, 1, 100) : SKIP,
-      ]);
-
-      if (rolesRes.status === 'fulfilled' && rolesRes.value) {
-        setRoles(rolesRes.value as Awaited<ReturnType<typeof clinicStaffRolesService.list>>);
-      } else if (rolesRes.status === 'rejected') {
-        setRolesError('Could not load staff roles.');
-      }
-
-      if (branchesRes.status === 'fulfilled' && branchesRes.value) {
-        setBranches((branchesRes.value as Awaited<ReturnType<typeof clinicBranchesService.list>>).items);
-      } else if (branchesRes.status === 'rejected') {
+      try {
+        const res = await clinicBranchesService.list(clinicId!, 1, 100);
+        setBranches(res.items);
+      } catch {
         setBranchesError('Could not load branch filter options.');
+      } finally {
+        setLoadingFilters(false);
       }
-
-      setLoadingFilters(false);
     }
 
     loadFilters();
-  }, [canViewStaff, canLoadRoles, canLoadBranches, clinicId]);
+  }, [canViewStaff, canLoadBranches, clinicId]);
 
   const fetchStaff = useCallback(async () => {
     setLoadingStaff(true);
@@ -145,13 +128,17 @@ export default function StaffList() {
         clinicBranchId: selectedBranchId || undefined,
       });
 
-      setStaff(result.items as StaffRow[]);
+      const doctors = (result.items as StaffRow[]).filter((s) =>
+        isDoctorRole(s.role?.name ?? undefined),
+      );
+
+      setStaff(doctors);
       setTotal(result.meta.total);
       setPage(result.meta.page);
       setTotalPages(result.meta.totalPages);
       setHasLoadedStaff(true);
     } catch (err) {
-      setStaffError(err instanceof Error ? err.message : 'Failed to load clinic staff.');
+      setStaffError(err instanceof Error ? err.message : 'Failed to load doctors.');
     } finally {
       setLoadingStaff(false);
     }
@@ -162,7 +149,6 @@ export default function StaffList() {
       setLoadingStaff(false);
       return;
     }
-
     fetchStaff();
   }, [canViewStaff, clinicId, fetchStaff]);
 
@@ -175,7 +161,7 @@ export default function StaffList() {
         <div className={styles.staffNameCell}>
           <div className={styles.avatar}>{fullName(row).slice(0, 2).toUpperCase()}</div>
           <div className={styles.nameText}>
-            <span>{fullName(row)}</span>
+            <span>Dr. {fullName(row)}</span>
             {row.id && <small>ID {String(row.id)}</small>}
           </div>
         </div>
@@ -184,7 +170,7 @@ export default function StaffList() {
     {
       key: 'email',
       label: 'Email',
-      width: '230px',
+      width: '220px',
       render: (row) => (
         <span className={styles.cellText}>
           <i className="bi bi-envelope" /> {row.email || '—'}
@@ -192,11 +178,11 @@ export default function StaffList() {
       ),
     },
     {
-      key: 'role',
-      label: 'Role',
+      key: 'specialty',
+      label: 'Specialty',
       width: '170px',
       render: (row) => {
-        const roleName = row.role?.name ?? (row.roleId ? roleById.get(String(row.roleId)) : '');
+        const roleName = row.role?.name;
         return roleName ? (
           <span className={styles.roleBadge}>{roleName}</span>
         ) : (
@@ -207,7 +193,7 @@ export default function StaffList() {
     {
       key: 'branches',
       label: 'Assigned branches',
-      width: '240px',
+      width: '230px',
       render: (row) => {
         const assignedBranches =
           row.branches && row.branches.length > 0
@@ -216,9 +202,7 @@ export default function StaffList() {
               ? [branchById.get(String(row.clinicBranchId))!]
               : [];
 
-        if (assignedBranches.length === 0) {
-          return <span className={styles.noData}>—</span>;
-        }
+        if (assignedBranches.length === 0) return <span className={styles.noData}>—</span>;
 
         return (
           <div className={styles.branchList}>
@@ -237,7 +221,7 @@ export default function StaffList() {
     {
       key: 'yearsOfExperience',
       label: 'Experience',
-      width: '130px',
+      width: '120px',
       render: (row) =>
         row.yearsOfExperience != null ? (
           <span className={styles.countBadge}>
@@ -250,7 +234,7 @@ export default function StaffList() {
     {
       key: 'joinedAt',
       label: 'Joined date',
-      width: '150px',
+      width: '140px',
       render: (row) => {
         const joined = formatDate(row.joinedAt);
         return joined ? (
@@ -294,18 +278,18 @@ export default function StaffList() {
           <div>
             <h1 className={styles.pageTitle}>Staff</h1>
             <p className={styles.pageSubtitle}>
-              {total > 0
-                ? `${total} staff member${total !== 1 ? 's' : ''} in your clinic`
-                : 'Search and manage clinic staff'}
+              {staff.length > 0
+                ? `${staff.length} doctor${staff.length !== 1 ? 's' : ''} in your clinic`
+                : 'Manage your clinic doctors'}
             </p>
           </div>
           {canCreateStaff && (
             <Button
               variant="primary"
               icon="bi-plus-lg"
-              onClick={() => navigate('/staff/create')}
+              onClick={() => navigate('/staff/doctors/create')}
             >
-              Create Staff
+              Add Doctor
             </Button>
           )}
         </div>
@@ -326,7 +310,7 @@ export default function StaffList() {
             <input
               type="search"
               className={styles.searchInput}
-              placeholder="Search staff"
+              placeholder="Search doctors"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -358,12 +342,6 @@ export default function StaffList() {
         </div>
       )}
 
-      {rolesError && (
-        <div className={`alert alert-warning py-2 ${styles.feedbackAlert}`} role="alert">
-          <i className="bi bi-exclamation-triangle-fill" /> {rolesError}
-        </div>
-      )}
-
       {branchesError && (
         <div className={`alert alert-warning py-2 ${styles.feedbackAlert}`} role="alert">
           <i className="bi bi-exclamation-triangle-fill" /> {branchesError}
@@ -387,11 +365,11 @@ export default function StaffList() {
           totalPages={totalPages}
           totalItems={total}
           onPageChange={setPage}
-          onEdit={canOpenStaffDetails ? (row) => navigate(`/staff/${row.id}`) : undefined}
+          onEdit={canOpenStaffDetails ? (row) => navigate(`/staff/doctors/${row.id}`) : undefined}
           emptyMessage={
             debouncedSearch || selectedBranchId
-              ? 'No staff members match your filters.'
-              : 'No staff members found.'
+              ? 'No doctors match your filters.'
+              : 'No doctors found. Staff with doctor, vet, physician, surgeon, or specialist roles appear here.'
           }
         />
       )}
