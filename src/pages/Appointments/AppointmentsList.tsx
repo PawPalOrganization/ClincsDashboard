@@ -13,7 +13,6 @@ import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
 import Button from '../../components/common/Button/Button';
 import PageHeaderSkeleton from '../../components/common/Skeleton/PageHeaderSkeleton';
-import TablePageSkeleton from '../../components/common/Skeleton/TablePageSkeleton';
 import styles from './Appointments.module.scss';
 
 type AppRow = Appointment & Record<string, unknown>;
@@ -132,8 +131,14 @@ export default function AppointmentsList() {
       width: '180px',
       render: (row) => (
         <div className={styles.doctorCell}>
-          <span>{row.contactName ?? `User #${row.userId ?? '—'}`}</span>
-          {row.contactPhone && <small>{row.contactPhone}</small>}
+          <span>
+            {row.contactName
+              ?? (row.user ? `${row.user.firstName} ${row.user.lastName}` : null)
+              ?? (row.userId ? `User #${row.userId}` : '—')}
+          </span>
+          {(row.contactPhone ?? row.user?.phoneNumber) && (
+            <small>{row.contactPhone ?? row.user?.phoneNumber}</small>
+          )}
         </div>
       ),
     },
@@ -188,7 +193,7 @@ export default function AppointmentsList() {
       label: 'Total',
       width: '100px',
       render: (row) => (
-        <span className={styles.costCell}>{row.totalCost != null ? `$${row.totalCost}` : '—'}</span>
+        <span className={styles.costCell}>{row.totalCost != null ? `EGP ${Number(row.totalCost).toFixed(2)}` : '—'}</span>
       ),
     },
     {
@@ -268,7 +273,7 @@ export default function AppointmentsList() {
               className={styles.searchInput}
               placeholder="Search by patient name"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
             {search && (
               <button type="button" className={styles.clearSearch} onClick={() => setSearch('')} aria-label="Clear">
@@ -280,7 +285,7 @@ export default function AppointmentsList() {
           <select
             className={styles.filterSelect}
             value={filterBranch}
-            onChange={(e) => setFilterBranch(e.target.value)}
+            onChange={(e) => { setFilterBranch(e.target.value); setPage(1); }}
             disabled={loadingBranches}
           >
             <option value="">All branches</option>
@@ -292,7 +297,7 @@ export default function AppointmentsList() {
           <select
             className={styles.filterSelect}
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as AppointmentStatus | '')}
+            onChange={(e) => { setFilterStatus(e.target.value as AppointmentStatus | ''); setPage(1); }}
           >
             <option value="">All statuses</option>
             <option value="reserved">Reserved</option>
@@ -304,30 +309,26 @@ export default function AppointmentsList() {
             type="date"
             className={styles.filterDate}
             value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
+            onChange={(e) => { setFilterDate(e.target.value); setPage(1); }}
           />
         </div>
       )}
 
-      {isInitialLoad ? (
-        <TablePageSkeleton columns={6} rows={8} />
-      ) : (
-        <DataTable
-          columns={columns}
-          data={appointments}
-          loading={loading}
-          currentPage={page}
-          totalPages={totalPages}
-          totalItems={total}
-          onPageChange={setPage}
-          onEdit={(row) => navigate(`/appointments/${row.id}`)}
-          emptyMessage={
-            debouncedSearch || filterBranch || filterStatus || filterDate
-              ? 'No appointments match your filters.'
-              : 'No appointments found.'
-          }
-        />
-      )}
+      <DataTable
+        columns={columns}
+        data={appointments}
+        loading={loading}
+        currentPage={page}
+        totalPages={totalPages}
+        totalItems={total}
+        onPageChange={setPage}
+        onEdit={(row) => navigate(`/appointments/${row.id}`)}
+        emptyMessage={
+          debouncedSearch || filterBranch || filterStatus || filterDate
+            ? 'No appointments match your filters.'
+            : 'No appointments found.'
+        }
+      />
     </div>
   );
 }

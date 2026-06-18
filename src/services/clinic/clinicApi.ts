@@ -78,17 +78,29 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   if (!response.ok) {
-    const body = json as { message?: string | string[]; errors?: Record<string, string[]>; error?: string };
+    const body = json as {
+      message?: string | string[];
+      errors?: Record<string, string[]> | Array<{ msg?: string; message?: string; path?: string }>;
+      error?: string;
+    };
     const rawMsg = body.message;
     let message = Array.isArray(rawMsg)
       ? rawMsg.join('; ')
       : rawMsg ?? `Request failed with status ${response.status}`;
-    // Surface nested field-level validation errors (NestJS format)
-    if (body.errors && typeof body.errors === 'object') {
-      const details = Object.values(body.errors).flat().join('; ');
+    // Surface field-level validation errors — handles both NestJS array format and object format
+    if (body.errors) {
+      let details = '';
+      if (Array.isArray(body.errors)) {
+        details = body.errors
+          .map((e) => (e.path ? `${e.path}: ${e.msg ?? e.message ?? ''}` : (e.msg ?? e.message ?? '')))
+          .filter(Boolean)
+          .join('; ');
+      } else if (typeof body.errors === 'object') {
+        details = Object.values(body.errors).flat().join('; ');
+      }
       if (details) message = `${message}: ${details}`;
     }
-    if (response.status >= 500) console.error('[API Error]', response.status, JSON.stringify(body));
+    console.error('[API Error]', response.status, JSON.stringify(body));
     throw new ApiError(response.status, message);
   }
 

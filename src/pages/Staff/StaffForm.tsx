@@ -52,6 +52,11 @@ interface HourEntry {
   endTime: string;
 }
 
+function stripSeconds(t?: string): string {
+  if (!t) return '';
+  return t.length > 5 ? t.slice(0, 5) : t;
+}
+
 function buildHoursState(workingHours?: BranchWorkingHour[]): HourEntry[] {
   return (Array.from({ length: 7 }) as undefined[]).map((_, i) => {
     const day = i as 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -59,8 +64,8 @@ function buildHoursState(workingHours?: BranchWorkingHour[]): HourEntry[] {
     return {
       dayOfWeek: day,
       enabled: !!found,
-      startTime: found?.startTime ?? '09:00',
-      endTime: found?.endTime ?? '17:00',
+      startTime: found ? stripSeconds(found.startTime) || '09:00' : '09:00',
+      endTime:   found ? stripSeconds(found.endTime)   || '17:00' : '17:00',
     };
   });
 }
@@ -77,6 +82,9 @@ export default function StaffForm({
   onSubmit,
 }: StaffFormProps) {
   const fieldDisabled = saving || readOnly;
+  const [imageUrl, setProfilePhoto_] = useState(defaultValues?.imageUrl ?? '');
+  const [imgLoadError, setImgLoadError] = useState(false);
+  function setProfilePhoto(val: string) { setProfilePhoto_(val); setImgLoadError(false); }
   const [firstName, setFirstName] = useState(defaultValues?.firstName ?? '');
   const [lastName, setLastName] = useState(defaultValues?.lastName ?? '');
   const [bio, setBio] = useState(defaultValues?.bio ?? '');
@@ -111,6 +119,7 @@ export default function StaffForm({
 
   useEffect(() => {
     if (!defaultValues) return;
+    setProfilePhoto(defaultValues.imageUrl ?? '');
     setFirstName(defaultValues.firstName ?? '');
     setLastName(defaultValues.lastName ?? '');
     setBio(defaultValues.bio ?? '');
@@ -171,9 +180,13 @@ export default function StaffForm({
       .filter((h) => h.enabled)
       .map((h) => ({ dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }));
 
+    const resolvedImageUrl = imageUrl.trim() || undefined;
+    console.log('[StaffForm] imageUrl being sent:', resolvedImageUrl ?? '(not included)');
+
     const shared = {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
+      imageUrl: resolvedImageUrl,
       bio: bio.trim() || undefined,
       email: email.trim(),
       password: password.trim() || undefined,
@@ -222,6 +235,52 @@ export default function StaffForm({
             <i className="bi bi-person" /> Profile
           </h2>
           <p className={styles.sectionDesc}>Core staff identity and contact information.</p>
+        </div>
+
+        {/* ── Profile Photo ── */}
+        <div className={styles.field}>
+          <label className={styles.fieldLabel}>Profile Photo</label>
+          <div className={styles.photoRow}>
+            {imageUrl && !imgLoadError ? (
+              <img
+                src={imageUrl}
+                alt="Profile"
+                className={styles.photoPreview}
+                onError={() => setImgLoadError(true)}
+              />
+            ) : (
+              <div className={styles.photoPlaceholder}>
+                {(firstName[0] ?? '?').toUpperCase()}{(lastName[0] ?? '').toUpperCase()}
+              </div>
+            )}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {/* Paste a public image URL */}
+              <input
+                type="text"
+                className={styles.selectInput}
+                placeholder="https://example.com/photo.jpg"
+                value={imageUrl}
+                onChange={(e) => setProfilePhoto(e.target.value)}
+                disabled={fieldDisabled}
+              />
+              {imgLoadError && imageUrl && (
+                <p className={styles.photoHint}>
+                  <i className="bi bi-exclamation-triangle-fill" />
+                  Could not load image from this URL. Make sure it's a direct link to an image (ends in .jpg, .png, etc.).
+                </p>
+              )}
+
+              {imageUrl && !fieldDisabled && (
+                <button
+                  type="button"
+                  className={styles.photoRemoveBtn}
+                  onClick={() => setProfilePhoto('')}
+                >
+                  <i className="bi bi-trash" /> Remove photo
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className={styles.twoCol}>

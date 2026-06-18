@@ -3,10 +3,12 @@ import type { ChangeEvent } from 'react';
 import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
 import MapPicker from '../../components/common/MapPicker/MapPicker';
+import clinicCatalogService from '../../services/clinic/clinicCatalogService';
 import type {
   BranchService,
   BranchWorkingHour,
   ClinicBranch,
+  ClinicService,
   CreateBranchPayload,
   UpdateBranchPayload,
 } from '../../types/clinic.types';
@@ -48,6 +50,7 @@ interface BranchFormProps {
   saving: boolean;
   serverError: string;
   readOnly?: boolean;
+  clinicId?: string | number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -61,13 +64,24 @@ function tagItemLabel(item: TagItem): string {
   return item.name ?? item.title ?? (item.id != null ? String(item.id) : '');
 }
 
-function buildDefaultServices(services?: BranchService[]): ServiceRow[] {
-  return (services ?? [])
-    .filter((s) => s.clinicServiceId != null && s.clinicServiceId > 0)
-    .map((s) => ({
-      clinicServiceId: String(s.clinicServiceId),
-      cost: String(s.cost),
-    }));
+function buildDefaultServices(rawServices?: BranchService[] | null): ServiceRow[] {
+  if (!Array.isArray(rawServices) || rawServices.length === 0) return [];
+  return rawServices
+    .map((s: any) => {
+      // The API returns branch services as full ClinicService objects: { id, name, cost, ... }
+      // The `id` here IS the clinic service ID. We also handle other possible shapes for safety.
+      const id = s.clinicServiceId   // standard field we send in update payload
+        ?? s.serviceId               // alternative naming
+        ?? s.clinicService?.id       // nested clinicService join
+        ?? s.service?.id             // nested service join
+        ?? s.id;                     // actual API shape: full service object with top-level id
+      if (id == null || Number(id) <= 0) return null;
+      return {
+        clinicServiceId: String(id),
+        cost: s.cost != null ? String(s.cost) : '0',
+      };
+    })
+    .filter((row): row is ServiceRow => row !== null);
 }
 
 function parseAddressParts(address?: string): { city: string; area: string; street: string } {
@@ -78,14 +92,19 @@ function parseAddressParts(address?: string): { city: string; area: string; stre
   return { street: '', area: parts[0], city: '' };
 }
 
+function stripSeconds(t?: string): string {
+  if (!t) return '';
+  return t.length > 5 ? t.slice(0, 5) : t;
+}
+
 function buildDefaultHours(workingHours?: BranchWorkingHour[]): HourEntry[] {
   return ([0, 1, 2, 3, 4, 5, 6] as const).map((d) => {
     const existing = workingHours?.find((h) => h.dayOfWeek === d);
     return {
       dayOfWeek: d,
       enabled: !!existing,
-      startTime: existing?.startTime ?? '09:00',
-      endTime: existing?.endTime ?? '17:00',
+      startTime: existing ? stripSeconds(existing.startTime) || '09:00' : '09:00',
+      endTime:   existing ? stripSeconds(existing.endTime)   || '17:00' : '17:00',
     };
   });
 }
@@ -99,7 +118,19 @@ export default function BranchForm({
   saving,
   serverError,
   readOnly = false,
+  clinicId,
 }: BranchFormProps) {
+  const [catalog, setCatalog] = useState<ClinicService[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+
+  useEffect(() => {
+    if (!clinicId) return;
+    setCatalogLoading(true);
+    clinicCatalogService.list(clinicId, { limit: 100 })
+      .then((res) => setCatalog(res.items))
+      .catch(() => {})
+      .finally(() => setCatalogLoading(false));
+  }, [clinicId]);
   const [title, setTitle]             = useState(defaultValues?.title ?? '');
   const [description, setDescription] = useState(defaultValues?.description ?? '');
   const [logoUrl, setLogoUrl]         = useState(defaultValues?.logoUrl ?? '');
@@ -488,53 +519,109 @@ export default function BranchForm({
 
         <div className={styles.field}>
           <label className={styles.fieldLabel}>Services & Pricing</label>
-          {services.map((row, index) => (
-            <div key={index} className={styles.serviceRow}>
-              <input
-                type="number"
-                className={styles.serviceIdInput}
-                placeholder="Service ID"
-                min={1}
-                value={row.clinicServiceId}
-                onChange={(e) => updateServiceRow(index, 'clinicServiceId', e.target.value)}
-                disabled={saving || readOnly}
-              />
-              <input
-                type="number"
-                className={styles.serviceCostInput}
-                placeholder="Cost"
-                min={0}
-                step="0.01"
-                value={row.cost}
-                onChange={(e) => updateServiceRow(index, 'cost', e.target.value)}
-                disabled={saving || readOnly}
-              />
-              {!readOnly && (
+
+          {catalog.length > 0 ? (
+            <>
+              {catalog.map((svc) => {
+                const existingIdx = services.findIndex((s) => s.clinicServiceId === String(svc.id));
+                const isSelected = existingIdx >= 0;
+                return (
+                  <div key={String(svc.id)} className={styles.catalogServiceRow}>
+                    <label className={styles.catalogServiceCheck}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={saving || readOnly}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setServices((prev) => [...prev, { clinicServiceId: String(svc.id), cost: '' }]);
+                          } else {
+                            setServices((prev) => prev.filter((s) => s.clinicServiceId !== String(svc.id)));
+                          }
+                        }}
+                      />
+                      <span className={styles.catalogServiceName}>
+                        {svc.name}
+                        {svc.isPlatform && <span className={styles.catalogPlatformBadge}>Platform</span>}
+                      </span>
+                    </label>
+                    {isSelected && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#6b7280', whiteSpace: 'nowrap' }}>EGP</span>
+                        <input
+                          type="number"
+                          className={`${styles.serviceCostInput} ${services[existingIdx]?.cost === '' || services[existingIdx]?.cost === '0' ? styles.serviceCostEmpty : ''}`}
+                          placeholder="e.g. 150"
+                          min={0}
+                          step="0.01"
+                          value={services[existingIdx]?.cost ?? ''}
+                          onChange={(e) => updateServiceRow(existingIdx, 'cost', e.target.value)}
+                          disabled={saving || readOnly}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <p className={styles.fieldHint}>
+                <i className="bi bi-exclamation-circle" style={{ color: '#f59e0b' }} /> Enter the cost (EGP) for each selected service — this will appear to staff when booking appointments.
+              </p>
+            </>
+          ) : (
+            <>
+              {catalogLoading && (
+                <p className={styles.fieldHint}><i className="bi bi-arrow-repeat" /> Loading service catalog…</p>
+              )}
+              {!catalogLoading && services.map((row, index) => (
+                <div key={index} className={styles.serviceRow}>
+                  <input
+                    type="number"
+                    className={styles.serviceIdInput}
+                    placeholder="Service ID"
+                    min={1}
+                    value={row.clinicServiceId}
+                    onChange={(e) => updateServiceRow(index, 'clinicServiceId', e.target.value)}
+                    disabled={saving || readOnly}
+                  />
+                  <input
+                    type="number"
+                    className={styles.serviceCostInput}
+                    placeholder="Cost"
+                    min={0}
+                    step="0.01"
+                    value={row.cost}
+                    onChange={(e) => updateServiceRow(index, 'cost', e.target.value)}
+                    disabled={saving || readOnly}
+                  />
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      className={styles.serviceRowRemove}
+                      onClick={() => removeServiceRow(index)}
+                      aria-label="Remove service"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!catalogLoading && !readOnly && (
                 <button
                   type="button"
-                  className={styles.serviceRowRemove}
-                  onClick={() => removeServiceRow(index)}
-                  aria-label="Remove service"
+                  className={styles.addServiceBtn}
+                  onClick={addServiceRow}
+                  disabled={saving}
                 >
-                  ×
+                  <i className="bi bi-plus-circle" /> Add Service
                 </button>
               )}
-            </div>
-          ))}
-          {!readOnly && (
-            <button
-              type="button"
-              className={styles.addServiceBtn}
-              onClick={addServiceRow}
-              disabled={saving}
-            >
-              <i className="bi bi-plus-circle" /> Add Service
-            </button>
+              {!catalogLoading && (
+                <p className={styles.fieldHint}>
+                  <i className="bi bi-info-circle" /> Service IDs are assigned in the admin dashboard. Your admin must add services to the catalog before they appear here.
+                </p>
+              )}
+            </>
           )}
-          <p className={styles.fieldHint}>
-            <i className="bi bi-info-circle" />
-            {' '}Service IDs are assigned by your admin in the admin dashboard. Ask your admin for the correct ID before adding a service here.
-          </p>
         </div>
       </div>
 

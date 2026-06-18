@@ -7,6 +7,7 @@ import type {
   CreateAppointmentPayload,
   PaginatedList,
   PaginatedResponse,
+  PaginationMeta,
   UpdateAppointmentPayload,
 } from '../../types/clinic.types';
 
@@ -27,14 +28,18 @@ const clinicAppointmentService = {
     });
 
     const raw = res.data;
+
+    // Backend returns { data: [...], meta: { total, page, limit, totalPages } }
+    // meta is top-level on res, not nested inside data
     if (Array.isArray(raw)) {
+      const topMeta = (res as Record<string, unknown>).meta as PaginationMeta | undefined;
       return {
         items: raw,
         meta: {
-          total: raw.length,
-          page: params.page ?? 1,
-          limit: params.limit ?? raw.length,
-          totalPages: 1,
+          total:      topMeta?.total      ?? raw.length,
+          page:       topMeta?.page       ?? params.page ?? 1,
+          limit:      topMeta?.limit      ?? params.limit ?? raw.length,
+          totalPages: topMeta?.totalPages ?? 1,
         },
       };
     }

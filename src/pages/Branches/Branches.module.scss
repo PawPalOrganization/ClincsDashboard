@@ -571,6 +571,11 @@
   }
 }
 
+.serviceCostEmpty {
+  border-color: #f59e0b !important;
+  background: #fffbeb;
+}
+
 .serviceRowRemove {
   display: inline-flex;
   align-items: center;
@@ -617,6 +622,53 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+}
+
+// ─── Catalog service picker ───────────────────────────────────────────────────
+
+.catalogServiceRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+
+  &:last-of-type { border-bottom: none; }
+}
+
+.catalogServiceCheck {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  cursor: pointer;
+  user-select: none;
+
+  input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+}
+
+.catalogServiceName {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1a1d2e;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.catalogPlatformBadge {
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: rgba(13, 154, 255, 0.1);
+  color: var(--color-primary);
+  border-radius: 4px;
+  padding: 0.05rem 0.4rem;
 }
 
 // ─── Bottom save ──────────────────────────────────────────────────────────────

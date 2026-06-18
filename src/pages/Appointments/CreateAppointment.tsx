@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
+import clinicCatalogService from '../../services/clinic/clinicCatalogService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
 import clinicUserSearchService from '../../services/clinic/clinicUserSearchService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type {
   BranchWorkingHour,
   ClinicBranch,
+  ClinicService,
   ClinicStaff,
   UserSearchResult,
 } from '../../types/clinic.types';
@@ -75,6 +77,7 @@ export default function CreateAppointment() {
   const [selectedDate, setSelectedDate] = useState('');
 
   // Step 2
+  const [selectedBranchDetail, setSelectedBranchDetail] = useState<ClinicBranch | null>(null);
   const [doctors, setDoctors] = useState<ClinicStaff[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState('');
@@ -92,12 +95,17 @@ export default function CreateAppointment() {
   // Step 4
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<number>>(new Set());
   const [notes, setNotes] = useState('');
+  const [catalog, setCatalog] = useState<ClinicService[]>([]);
 
-  // Derived
-  const _real = (branches.find((b) => String(b.id) === selectedBranch)?.services ?? [])
-    .filter((s) => s.clinicServiceId != null && s.clinicServiceId > 0);
-  // TODO: remove TEMP fallback once admin assigns real services to branches
-  const validServices = _real.length > 0 ? _real : [{ clinicServiceId: 4, cost: 0 }];
+  // Lookup map: clinicServiceId → name from catalog
+  const catalogMap = new Map(catalog.map((s) => [Number(s.id), s.name]));
+
+  // Services to show in step 4: use full branch detail (has costs), fallback to catalog
+  const branchServices = (selectedBranchDetail?.services ?? [])
+    .filter((s) => s.clinicServiceId != null && Number(s.clinicServiceId) > 0);
+  const validServices = branchServices.length > 0
+    ? branchServices
+    : catalog.map((s) => ({ clinicServiceId: Number(s.id), cost: 0 }));
 
   const doctorObj = doctors.find((d) => String(d.id) === selectedDoctor);
   const finalTime = selectedSlot || manualTimes[selectedDoctor] || '';
@@ -109,19 +117,25 @@ export default function CreateAppointment() {
     clinicBranchesService.list(clinicId, 1, 100)
       .then((r) => setBranches(r.items))
       .catch(() => {});
+    clinicCatalogService.list(clinicId, { limit: 100 })
+      .then((r) => setCatalog(r.items))
+      .catch(() => {});
   }, [clinicId]);
 
-  // Fetch doctors when branch changes
+  // Fetch doctors + full branch detail (with services/costs) when branch changes
   useEffect(() => {
-    if (!selectedBranch) { setDoctors([]); return; }
+    if (!selectedBranch || !clinicId) { setDoctors([]); setSelectedBranchDetail(null); return; }
     setLoadingDoctors(true);
     setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
     setSelectedServiceIds(new Set());
+    clinicBranchesService.getOne(clinicId, selectedBranch)
+      .then((b) => setSelectedBranchDetail(b))
+      .catch(() => setSelectedBranchDetail(null));
     clinicStaffService.list({ page: 1, limit: 100, clinicBranchId: selectedBranch })
       .then((r) => setDoctors(r.items.filter(isDoctor)))
       .catch(() => {})
       .finally(() => setLoadingDoctors(false));
-  }, [selectedBranch]);
+  }, [selectedBranch, clinicId]);
 
   // Reset doctor/slot when date changes
   useEffect(() => {
@@ -162,7 +176,7 @@ export default function CreateAppointment() {
     if (step === 1) return !!selectedBranch && !!selectedDate;
     if (step === 2) return !!selectedDoctor && !!finalTime;
     if (step === 3) return isWalkIn ? !!walkInName.trim() : !!selectedUser;
-    if (step === 4) return selectedServiceIds.size > 0;
+    if (step === 4) return validServices.length > 0 && selectedServiceIds.size > 0;
     return false;
   }
 
@@ -320,7 +334,9 @@ export default function CreateAppointment() {
                       {/* Header row */}
                       <div className={styles.doctorCardHeader}>
                         <div className={styles.doctorAvatar}>
-                          {doc.firstName[0]}{doc.lastName[0]}
+                          {doc.imageUrl
+                            ? <img src={doc.imageUrl} alt="" className={styles.doctorAvatarPhoto} />
+                            : <>{doc.firstName[0]}{doc.lastName[0]}</>}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div className={styles.doctorName}>Dr. {doc.firstName} {doc.lastName}</div>
@@ -476,25 +492,44 @@ export default function CreateAppointment() {
             </div>
 
             {/* Services */}
+            {validServices.length === 0 && (
+              <div className="alert alert-info py-2" style={{ fontSize: '0.875rem', marginTop: '1.25rem' }}>
+                <i className="bi bi-info-circle" /> No services available for this branch yet.
+              </div>
+            )}
+            {validServices.length > 0 && validServices.every((s) => Number(s.cost) === 0) && (
+              <div className="alert alert-warning py-2" style={{ fontSize: '0.825rem', marginTop: '1rem' }}>
+                <i className="bi bi-exclamation-triangle" /> Service costs are not set for this branch. Go to <strong>Branches → Edit</strong> and enter a price for each service.
+              </div>
+            )}
             <div className={styles.serviceCheckList} style={{ marginTop: '1.25rem' }}>
               {validServices.map((s) => {
                 const checked = selectedServiceIds.has(s.clinicServiceId);
+                const name = catalogMap.get(s.clinicServiceId) ?? `Service #${s.clinicServiceId}`;
                 return (
                   <label key={s.clinicServiceId} className={`${styles.serviceCheckItem} ${checked ? styles.checked : ''}`}>
                     <input type="checkbox" checked={checked} onChange={() => toggleService(s.clinicServiceId)} />
-                    <span className={styles.serviceCheckName}>Service #{s.clinicServiceId}</span>
-                    <span className={styles.serviceCheckCost}>${s.cost}</span>
+                    <span className={styles.serviceCheckName}>{name}</span>
+                    <span className={styles.serviceCheckCost}>EGP {Number(s.cost).toFixed(2)}</span>
                   </label>
                 );
               })}
             </div>
 
-            {selectedServiceIds.size > 0 && (
-              <div className={styles.totalRow}>
-                <span>Estimated total</span>
-                <span>${validServices.filter((s) => selectedServiceIds.has(s.clinicServiceId)).reduce((sum, s) => sum + s.cost, 0)}</span>
-              </div>
-            )}
+            {selectedServiceIds.size > 0 && (() => {
+              const total = validServices
+                .filter((s) => selectedServiceIds.has(s.clinicServiceId))
+                .reduce((sum, s) => sum + Number(s.cost), 0);
+              return (
+                <div className={styles.totalRow}>
+                  <span>Estimated total</span>
+                  {total > 0
+                    ? <span>EGP {total.toFixed(2)}</span>
+                    : <span style={{ color: '#9ca3af', fontSize: '0.8rem' }}>Calculated at checkout</span>
+                  }
+                </div>
+              );
+            })()}
 
             <div style={{ marginTop: '1rem' }}>
               <label className={styles.fieldLabel}>Notes</label>

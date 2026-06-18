@@ -71,3 +71,7 @@ body {
 .shadow-custom-lg {
   box-shadow: var(--shadow-lg);
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
@@ -80,21 +80,26 @@ export default function EditBranch() {
     );
   }
 
-  const defaultValues: BranchFormInitialValues | undefined = branch
-    ? {
-        title:        branch.title,
-        description:  branch.description,
-        logoUrl:      branch.logoUrl,
-        isMainBranch: branch.isMainBranch,
-        phoneNumber:  branch.phoneNumber,
-        lat:          branch.lat,
-        lng:          branch.lng,
-        address:      branch.address,
-        services:     branch.services,
-        tags:         branch.tags,
-        workingHours: branch.workingHours,
-      }
-    : undefined;
+  // useMemo ensures defaultValues only changes when `branch` changes, not on every render
+  // (saving/serverError re-renders must not reset form state the user is editing)
+  const defaultValues = useMemo<BranchFormInitialValues | undefined>(
+    () => branch
+      ? {
+          title:        branch.title,
+          description:  branch.description,
+          logoUrl:      branch.logoUrl,
+          isMainBranch: branch.isMainBranch,
+          phoneNumber:  branch.phoneNumber,
+          lat:          branch.lat,
+          lng:          branch.lng,
+          address:      branch.address,
+          services:     branch.services,
+          tags:         branch.tags,
+          workingHours: branch.workingHours,
+        }
+      : undefined,
+    [branch],
+  );
 
   return (
     <>
@@ -148,6 +153,7 @@ export default function EditBranch() {
             saving={saving}
             serverError={serverError}
             readOnly={!canUpdateBranch}
+            clinicId={clinicId ?? undefined}
           />
         )}
 

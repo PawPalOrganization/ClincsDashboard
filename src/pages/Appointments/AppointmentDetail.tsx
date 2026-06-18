@@ -174,9 +174,19 @@ export default function AppointmentDetail() {
               <p className={styles.detailCardTitle}>Patient</p>
               <div className={styles.detailRow}>
                 <label>Name</label>
-                <span>{appointment.contactName ?? (appointment.userId ? `User #${appointment.userId}` : '—')}</span>
+                <span>
+                  {appointment.contactName
+                    ?? (appointment.user ? `${appointment.user.firstName} ${appointment.user.lastName}` : null)
+                    ?? (appointment.userId ? `User #${appointment.userId}` : '—')}
+                </span>
               </div>
-              {appointment.contactPhone && (
+              {appointment.user?.phoneNumber && (
+                <div className={styles.detailRow}>
+                  <label>Phone</label>
+                  <span>{appointment.user.phoneNumber}</span>
+                </div>
+              )}
+              {appointment.contactPhone && !appointment.user?.phoneNumber && (
                 <div className={styles.detailRow}>
                   <label>Phone</label>
                   <span>{appointment.contactPhone}</span>
@@ -242,18 +252,28 @@ export default function AppointmentDetail() {
 
             {/* Services */}
             <div className={styles.detailCard}>
-              <p className={styles.detailCardTitle}>Services</p>
+              <p className={styles.detailCardTitle}>Services & Cost</p>
               {appointment.services.length > 0 ? (
                 <>
                   {appointment.services.map((s, i) => (
-                    <div key={i} className={styles.detailRow}>
-                      <label>{s.name ?? `Service #${s.clinicServiceId}`}</label>
-                      <span>${s.cost}</span>
+                    <div key={i} className={styles.serviceRow}>
+                      <span className={styles.serviceName}>
+                        {s.name ?? `Service #${s.clinicServiceId}`}
+                      </span>
+                      <span className={styles.serviceCost}>
+                        {Number(s.cost) > 0
+                          ? `EGP ${Number(s.cost).toFixed(2)}`
+                          : <span className={styles.costIncluded}>included</span>}
+                      </span>
                     </div>
                   ))}
                   <div className={styles.totalRow}>
                     <span>Total</span>
-                    <span>${appointment.totalCost}</span>
+                    <span>
+                      {Number(appointment.totalCost) > 0
+                        ? `EGP ${Number(appointment.totalCost).toFixed(2)}`
+                        : '—'}
+                    </span>
                   </div>
                 </>
               ) : (

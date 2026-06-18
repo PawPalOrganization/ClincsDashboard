@@ -59,6 +59,7 @@ export interface ClinicStaff {
   firstName: string;
   lastName: string;
   email: string;
+  imageUrl?: string;
   bio?: string;
   birthDate?: string;
   gender?: 'male' | 'female' | 'other';
@@ -124,9 +125,38 @@ export interface BranchService {
 
 export interface ClinicService {
   id: string | number;
+  clinicId: number | null;
+  isPlatform: boolean;
   name: string;
   description?: string;
-  logoUrl?: string;
+  logoUrl?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateClinicServicePayload {
+  name: string;
+  description?: string | null;
+  logoUrl?: string | null;
+}
+
+export interface UpdateClinicServicePayload {
+  name?: string;
+  description?: string | null;
+  logoUrl?: string | null;
+}
+
+export interface ClinicServiceListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export interface UploadedFile {
+  bucket?: string;
+  key?: string;
+  signedUrl?: string;
+  publicUrl: string;
 }
 
 // ─── Request payloads ─────────────────────────────────────────────────────────
@@ -183,6 +213,7 @@ export interface CreateClinicStaffPayload {
   lastName: string;
   email: string;
   password: string;
+  imageUrl?: string;
   bio?: string;
   gender?: 'male' | 'female' | 'other';
   yearsOfExperience?: number;
@@ -198,6 +229,7 @@ export interface CreateClinicStaffPayload {
 export interface UpdateClinicStaffPayload {
   firstName?: string;
   lastName?: string;
+  imageUrl?: string;
   bio?: string;
   email?: string;
   password?: string;
@@ -232,6 +264,13 @@ export interface AppointmentDoctor {
   role?: { name: string };
 }
 
+export interface AppointmentUser {
+  id: string | number;
+  firstName: string;
+  lastName: string;
+  phoneNumber?: string;
+}
+
 export interface Appointment {
   id: string | number;
   clinicBranchId: string | number;
@@ -246,6 +285,7 @@ export interface Appointment {
   status: AppointmentStatus;
   notes?: string;
   doctor?: AppointmentDoctor;
+  user?: AppointmentUser;
   services: AppointmentService[];
   totalCost: number;
   visitorOrder?: number;

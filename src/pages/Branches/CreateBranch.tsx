@@ -77,6 +77,7 @@ export default function CreateBranch() {
           onSubmit={handleSubmit}
           saving={saving}
           serverError={serverError}
+          clinicId={clinicId ?? undefined}
         />
       </div>
     </>

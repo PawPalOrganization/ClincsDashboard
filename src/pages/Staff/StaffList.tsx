@@ -173,7 +173,11 @@ export default function StaffList() {
       width: '220px',
       render: (row) => (
         <div className={styles.staffNameCell}>
-          <div className={styles.avatar}>{fullName(row).slice(0, 2).toUpperCase()}</div>
+          {row.imageUrl ? (
+            <img src={String(row.imageUrl)} alt="" className={styles.avatarPhoto} />
+          ) : (
+            <div className={styles.avatar}>{fullName(row).slice(0, 2).toUpperCase()}</div>
+          )}
           <div className={styles.nameText}>
             <span>{fullName(row)}</span>
             {row.id && <small>ID {String(row.id)}</small>}

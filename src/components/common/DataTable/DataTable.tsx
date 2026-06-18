@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import TablePageSkeleton from '../Skeleton/TablePageSkeleton';
 import styles from './DataTable.module.scss';
 
 export interface DataRow {
@@ -29,6 +30,7 @@ interface DataTableProps<T extends DataRow> {
 export default function DataTable<T extends DataRow>({
   columns,
   data,
+  loading = false,
   currentPage,
   totalPages,
   totalItems,
@@ -51,18 +53,18 @@ export default function DataTable<T extends DataRow>({
     for (let i = startPage; i <= endPage; i++) pages.push(i);
 
     return (
-      <div className={styles.pagination}>
+      <div className={`${styles.pagination} ${loading ? styles.paginationLoading : ''}`}>
         <button
           className={styles.pageButton}
           onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
+          disabled={loading || currentPage === 1}
         >
           <i className="bi bi-chevron-left" />
         </button>
 
         {startPage > 1 && (
           <>
-            <button className={styles.pageButton} onClick={() => onPageChange(1)}>
+            <button className={styles.pageButton} onClick={() => onPageChange(1)} disabled={loading}>
               1
             </button>
             {startPage > 2 && <span className={styles.ellipsis}>...</span>}
@@ -79,6 +81,7 @@ export default function DataTable<T extends DataRow>({
               .filter(Boolean)
               .join(' ')}
             onClick={() => onPageChange(page)}
+            disabled={loading}
           >
             {page}
           </button>
@@ -90,6 +93,7 @@ export default function DataTable<T extends DataRow>({
             <button
               className={styles.pageButton}
               onClick={() => onPageChange(totalPages)}
+              disabled={loading}
             >
               {totalPages}
             </button>
@@ -99,7 +103,7 @@ export default function DataTable<T extends DataRow>({
         <button
           className={styles.pageButton}
           onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
+          disabled={loading || currentPage === totalPages}
         >
           <i className="bi bi-chevron-right" />
         </button>
@@ -107,7 +111,11 @@ export default function DataTable<T extends DataRow>({
     );
   }
 
-  if (!data || data.length === 0) {
+  if (loading && (!data || data.length === 0)) {
+    return <TablePageSkeleton columns={columns.length} rows={8} />;
+  }
+
+  if (!loading && (!data || data.length === 0)) {
     return (
       <div className={styles.emptyContainer}>
         <i className="bi bi-inbox" style={{ fontSize: '3rem', color: '#7F8C8D' }} />
@@ -130,7 +138,7 @@ export default function DataTable<T extends DataRow>({
               {(onEdit || onDelete) && <th style={{ width: '120px' }}>Actions</th>}
             </tr>
           </thead>
-          <tbody>
+          <tbody className={loading ? styles.tbodyLoading : ''}>
             {data.map((row, index) => (
               <tr key={row.id != null ? String(row.id) : index}>
                 {columns.map((col) => (

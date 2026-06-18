@@ -201,6 +201,18 @@
   }
 }
 
+.paginationLoading {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.tbodyLoading {
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
 .pageButton {
   display: flex;
   align-items: center;

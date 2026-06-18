@@ -20,6 +20,7 @@ import AppointmentsList from './pages/Appointments/AppointmentsList';
 import TodayQueue from './pages/Appointments/TodayQueue';
 import CreateAppointment from './pages/Appointments/CreateAppointment';
 import AppointmentDetail from './pages/Appointments/AppointmentDetail';
+import ServicesList from './pages/Services/ServicesList';
 
 // ─── Root redirect ─────────────────────────────────────────────────────────
 // Reads auth state and sends the user to the right place.
@@ -107,6 +108,7 @@ export default function App() {
               <Route path="/appointments/today"  element={<TodayQueue />} />
               <Route path="/appointments/create" element={<CreateAppointment />} />
               <Route path="/appointments/:id"    element={<AppointmentDetail />} />
+              <Route path="/services"            element={<ServicesList />} />
               <Route path="/settings"            element={<ClinicSettings />} />
             </Route>
           </Route>
