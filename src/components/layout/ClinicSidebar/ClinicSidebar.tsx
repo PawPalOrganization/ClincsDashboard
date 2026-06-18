@@ -71,7 +71,7 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
 
       setNotifications(items);
       setUnreadCount(
-        (res.meta as Record<string, unknown>).unreadCount as number
+        (res.meta as unknown as Record<string, unknown>).unreadCount as number
           ?? items.filter((n) => !n.isRead).length,
       );
     } catch {}
