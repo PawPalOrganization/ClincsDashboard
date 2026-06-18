@@ -565,3 +565,203 @@
   font-size: 0.9rem;
   color: #111827;
 }
+
+// ─── Create Appointment — shared inputs ───────────────────────────────────────
+
+.fieldLabel {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.4rem;
+}
+
+.dateInput,
+.textInput,
+.timeInput {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #111827;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary, #0d9aff);
+    box-shadow: 0 0 0 3px rgba(13, 154, 255, 0.1);
+  }
+}
+
+// ─── Doctor availability grid (Step 2) ────────────────────────────────────────
+
+.doctorGrid {
+  display: grid;
+  gap: 0.875rem;
+}
+
+.doctorCard {
+  border: 1.5px solid #e4e7ec;
+  border-radius: 0.75rem;
+  padding: 1rem 1.125rem;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &:hover:not(.doctorCardOff) {
+    border-color: rgba(13, 154, 255, 0.3);
+  }
+}
+
+.doctorCardSelected {
+  border-color: var(--color-primary, #0d9aff);
+  box-shadow: 0 0 0 3px rgba(13, 154, 255, 0.1);
+}
+
+.doctorCardOff {
+  opacity: 0.55;
+  background: #fafafa;
+}
+
+.doctorCardHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.875rem;
+}
+
+.doctorAvatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(13, 154, 255, 0.1);
+  color: var(--color-primary, #0d9aff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.doctorName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.doctorRole {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.1rem;
+}
+
+.doctorSelectedBadge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(13, 154, 255, 0.1);
+  color: var(--color-primary, #0d9aff);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+// Time slot buttons
+.slotGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.slotBtn {
+  padding: 0.3rem 0.7rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+
+  &:hover {
+    border-color: var(--color-primary, #0d9aff);
+    color: var(--color-primary, #0d9aff);
+    background: rgba(13, 154, 255, 0.05);
+  }
+}
+
+.slotBtnSelected {
+  border-color: var(--color-primary, #0d9aff);
+  background: var(--color-primary, #0d9aff);
+  color: #fff;
+
+  &:hover {
+    background: #0b7fd9;
+    color: #fff;
+  }
+}
+
+.doctorOffLabel {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+// Manual time fallback
+.manualTimeWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.manualTimeLabel {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.timeInput {
+  width: auto;
+  min-width: 130px;
+}
+
+// ─── Step 4 booking summary ────────────────────────────────────────────────────
+
+.bookingSummary {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  background: #f8faff;
+  border: 1px solid #e0eeff;
+  border-radius: 0.625rem;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.875rem;
+  color: #374151;
+
+  i {
+    font-size: 0.85rem;
+    color: var(--color-primary, #0d9aff);
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+  }
+}
