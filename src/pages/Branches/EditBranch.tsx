@@ -90,7 +90,7 @@ export default function EditBranch() {
         lat:          branch.lat,
         lng:          branch.lng,
         address:      branch.address,
-        serviceIds:   branch.serviceIds,
+        services:     branch.services,
         tags:         branch.tags,
         workingHours: branch.workingHours,
       }
