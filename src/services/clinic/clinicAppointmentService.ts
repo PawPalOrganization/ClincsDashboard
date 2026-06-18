@@ -32,7 +32,7 @@ const clinicAppointmentService = {
     // Backend returns { data: [...], meta: { total, page, limit, totalPages } }
     // meta is top-level on res, not nested inside data
     if (Array.isArray(raw)) {
-      const topMeta = (res as Record<string, unknown>).meta as PaginationMeta | undefined;
+      const topMeta = (res as unknown as Record<string, unknown>).meta as PaginationMeta | undefined;
       return {
         items: raw,
         meta: {
