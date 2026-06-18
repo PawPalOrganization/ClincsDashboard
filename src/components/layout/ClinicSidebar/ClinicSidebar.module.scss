@@ -229,11 +229,11 @@
   position: relative;
   padding: 0.65rem 0.875rem 0.65rem 0.875rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: default;
+  cursor: pointer;
   transition: background 0.1s;
 
   &:last-child { border-bottom: none; }
-  &:hover { background: rgba(255, 255, 255, 0.03); }
+  &:hover { background: rgba(255, 255, 255, 0.06); }
 }
 
 .notifItemUnread {

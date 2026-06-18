@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../../context/ClinicAuthContext';
 import { hasClinicPermission } from '../../../utils/clinicPermissions';
 import type { ClinicPermissionSlug } from '../../../utils/clinicPermissions';
 import clinicProfileService from '../../../services/clinic/clinicProfileService';
 import clinicNotificationService from '../../../services/clinic/clinicNotificationService';
+import { useClinicPusher } from '../../../hooks/useClinicPusher';
+import NotificationToast from '../../common/NotificationToast/NotificationToast';
+import type { ToastItem } from '../../common/NotificationToast/NotificationToast';
 import type { Clinic, ClinicNotification } from '../../../types/clinic.types';
 import styles from './ClinicSidebar.module.scss';
 
@@ -30,7 +33,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
-  const { staff, clinicId, logout } = useClinicAuth();
+  const { staff, clinicId, token, branchId, logout } = useClinicAuth();
   const [clinic, setClinic] = useState<Clinic | null>(null);
 
   // ── Notifications ──────────────────────────────────────────────────────────
@@ -39,12 +42,37 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
 
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const seenIdsRef = useRef<Set<string | number>>(new Set());
+  const initialLoadDoneRef = useRef(false);
+
+  function dismissToast(key: string) {
+    setToasts((prev) => prev.filter((t) => t.key !== key));
+  }
+
   async function loadNotifications() {
     try {
       const res = await clinicNotificationService.list({ limit: 10 });
-      setNotifications(res.items);
+      const items = res.items;
+
+      if (initialLoadDoneRef.current) {
+        // On subsequent polls, surface any unread IDs we haven't seen before
+        const fresh = items.filter((n) => !n.isRead && !seenIdsRef.current.has(n.id));
+        if (fresh.length > 0) {
+          setToasts((prev) => [
+            ...prev.slice(-(2)),          // keep at most 2 existing
+            ...fresh.map((n) => ({ notification: n, key: `${n.id}-${Date.now()}` })),
+          ]);
+        }
+      }
+
+      items.forEach((n) => seenIdsRef.current.add(n.id));
+      initialLoadDoneRef.current = true;
+
+      setNotifications(items);
       setUnreadCount(
-        res.meta.unreadCount ?? res.items.filter((n) => !n.isRead).length,
+        (res.meta as Record<string, unknown>).unreadCount as number
+          ?? items.filter((n) => !n.isRead).length,
       );
     } catch {}
   }
@@ -54,6 +82,21 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
     const interval = setInterval(loadNotifications, 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  // ── Pusher real-time notifications ────────────────────────────────────────
+  const handlePusherNotification = useCallback((n: ClinicNotification) => {
+    // Prepend to the bell list
+    setNotifications((prev) => [n, ...prev.slice(0, 19)]);
+    // Increment badge
+    setUnreadCount((prev) => prev + 1);
+    // Show toast
+    setToasts((prev) => [
+      ...prev.slice(-2),
+      { notification: n, key: `${n.id}-${Date.now()}` },
+    ]);
+  }, []);
+
+  useClinicPusher({ token, staff, branchId, onNotification: handlePusherNotification });
 
   useEffect(() => {
     if (!bellOpen) return;
@@ -191,7 +234,15 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
                   <li
                     key={String(n.id)}
                     className={`${styles.notifItem} ${!n.isRead ? styles.notifItemUnread : ''}`}
-                    onClick={() => { if (!n.isRead) handleMarkRead(n.id); }}
+                    onClick={() => {
+                      if (!n.isRead) handleMarkRead(n.id);
+                      setBellOpen(false);
+                      if (n.data?.appointmentId) {
+                        navigate(`/appointments/${n.data.appointmentId}`);
+                      } else {
+                        navigate('/appointments');
+                      }
+                    }}
                   >
                     <div className={styles.notifTitle}>{n.title}</div>
                     <div className={styles.notifBody}>{n.body}</div>
@@ -211,6 +262,19 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
           </div>
         )}
       </div>
+
+      {/* Toast notifications (portal → document.body) */}
+      <NotificationToast
+        toasts={toasts}
+        onDismiss={dismissToast}
+        onNavigate={(n) => {
+          if (n.data?.appointmentId) {
+            navigate(`/appointments/${n.data.appointmentId}`);
+          } else {
+            navigate('/appointments');
+          }
+        }}
+      />
 
       {/* Bottom: profile card + logout */}
       <div className={styles.bottomSection}>

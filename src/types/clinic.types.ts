@@ -339,14 +339,25 @@ export interface AppointmentListParams {
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
+export interface ClinicNotificationData {
+  appointmentId?: number;
+  clinicBranchId?: number;
+  branchTitle?: string;
+  scheduledAt?: string;
+  visitorOrder?: number;
+  cancelledBy?: 'user' | 'clinic';
+  cancellationReason?: string | null;
+}
+
 export interface ClinicNotification {
   id: string | number;
   title: string;
   body: string;
-  type?: string;
+  type?: 'appointment_booked' | 'appointment_cancelled' | string;
   isRead: boolean;
   createdAt: string;
   branchId?: string | number;
+  data?: ClinicNotificationData | null;
 }
 
 // ─── User search (for appointment booking) ───────────────────────────────────

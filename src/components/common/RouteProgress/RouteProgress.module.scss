@@ -1,0 +1,29 @@
+@keyframes progressFill {
+  0%   { width: 0%;   opacity: 1; }
+  30%  { width: 55%;  }
+  60%  { width: 78%;  }
+  100% { width: 92%;  }
+}
+
+@keyframes progressComplete {
+  0%   { width: 92%; opacity: 1; }
+  60%  { width: 100%; opacity: 1; }
+  100% { width: 100%; opacity: 0; }
+}
+
+.bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  z-index: 99999;
+  background: var(--color-primary, #0d9aff);
+  box-shadow: 0 0 8px rgba(13, 154, 255, 0.6);
+  border-radius: 0 2px 2px 0;
+  animation: progressFill 500ms ease-out forwards;
+  pointer-events: none;
+
+  &.done {
+    animation: progressComplete 400ms ease-in forwards;
+  }
+}

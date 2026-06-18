@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import ClinicSidebar from '../ClinicSidebar/ClinicSidebar';
+import RouteProgress from '../../common/RouteProgress/RouteProgress';
 import styles from './ClinicLayout.module.scss';
 
 export default function ClinicLayout() {
+  const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1200);
 
   useEffect(() => {
@@ -19,6 +21,7 @@ export default function ClinicLayout() {
 
   return (
     <div className={styles.layout}>
+      <RouteProgress />
 
       {/* Hamburger — animates out when sidebar is open */}
       <button
@@ -43,7 +46,7 @@ export default function ClinicLayout() {
           !isSidebarOpen ? styles.sidebarClosed : ''
         }`}
       >
-        <div className={styles.contentWrapper}>
+        <div key={location.pathname} className={styles.contentWrapper}>
           <Outlet />
         </div>
       </main>

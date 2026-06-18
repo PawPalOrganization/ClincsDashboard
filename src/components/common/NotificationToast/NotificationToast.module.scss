@@ -1,0 +1,173 @@
+.container {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  pointer-events: none;
+}
+
+// ── Entrance: pounce in from the right ────────────────────────────────────────
+@keyframes pawPounce {
+  0%   { transform: translateX(110%) scale(0.88); opacity: 0; }
+  55%  { transform: translateX(-10px) scale(1.03); opacity: 1; }
+  75%  { transform: translateX(5px) scale(0.98); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+@keyframes pawExit {
+  0%   { transform: translateX(0) scale(1); opacity: 1; }
+  30%  { transform: translateX(-6px) scale(1.02); }
+  100% { transform: translateX(115%) scale(0.9); opacity: 0; }
+}
+
+@keyframes progressShrink {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+// ── Toast card ─────────────────────────────────────────────────────────────────
+.toast {
+  pointer-events: all;
+  position: relative;
+  width: 320px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  border-left: 4px solid var(--color-primary, #0d9aff);
+  animation: pawPounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+
+  &:hover {
+    box-shadow:
+      0 12px 36px rgba(0, 0, 0, 0.16),
+      0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  &.exit {
+    animation: pawExit 0.42s cubic-bezier(0.36, 0, 0.66, -0.56) forwards;
+  }
+}
+
+// ── Big faded paw behind the content ──────────────────────────────────────────
+.pawWatermark {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  font-size: 5rem;
+  opacity: 0.07;
+  user-select: none;
+  line-height: 1;
+  pointer-events: none;
+}
+
+// ── Header row ─────────────────────────────────────────────────────────────────
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.875rem 0.4rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #ff7a1a;
+}
+
+.pawDot {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: #9ba3af;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+}
+
+// ── Body ───────────────────────────────────────────────────────────────────────
+.title {
+  margin: 0;
+  padding: 0.6rem 0.875rem 0.2rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1a1d2e;
+  line-height: 1.35;
+}
+
+.body {
+  margin: 0;
+  padding: 0 0.875rem 0.5rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+// ── Footer ─────────────────────────────────────────────────────────────────────
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.875rem 0.6rem;
+}
+
+.time {
+  font-size: 0.72rem;
+  color: #9ba3af;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.viewLink {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-primary, #0d9aff);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+// ── Auto-dismiss progress bar ──────────────────────────────────────────────────
+.progressTrack {
+  height: 3px;
+  background: #f3f4f6;
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--color-primary, #0d9aff);
+  animation: progressShrink linear forwards;
+}
