@@ -237,7 +237,7 @@ export default function AppointmentsList() {
               {total > 0 ? `${total} appointment${total !== 1 ? 's' : ''}` : 'Manage clinic appointments'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className={styles.headerActions}>
             <Button
               variant="outline"
               icon="bi-list-check"

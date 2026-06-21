@@ -17,6 +17,10 @@
   padding: 2rem 2.5rem;
   position: relative;
   overflow: hidden;
+
+  @media (max-width: 576px) {
+    padding: 1.25rem 1.25rem;
+  }
 }
 
 .welcomeBannerSkeleton {
@@ -31,6 +35,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
+
+  > div:first-child {
+    min-width: 0; // allow text to shrink and wrap inside the flex item
+  }
 }
 
 .greeting {
@@ -38,6 +47,11 @@
   font-weight: 700;
   color: #ffffff;
   margin: 0 0 0.4rem;
+  overflow-wrap: break-word;
+
+  @media (max-width: 576px) {
+    font-size: 1.2rem;
+  }
 }
 
 .clinicName {
@@ -87,11 +101,11 @@
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 
   @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -136,6 +150,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @media (max-width: 768px) {
+    max-width: 100%;
+  }
 }
 
 .statLabel {
@@ -166,12 +184,8 @@
 
 .actionsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
-
-  @media (max-width: 900px) {
-    grid-template-columns: 1fr;
-  }
 }
 
 .actionCard {
@@ -355,6 +369,98 @@
   padding: 1.25rem 1.375rem;
   color: #e87070;
   font-size: 0.875rem;
+}
+
+// ─── Section header (title + view-all link) ───────────────────────────────────
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sectionLink {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #0d9aff;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+
+  &:hover { text-decoration: underline; }
+}
+
+// ─── Today's bookings row ─────────────────────────────────────────────────────
+
+.bookingRow {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1.375rem;
+  border-bottom: 1px solid #f8f8f8;
+  text-decoration: none;
+  transition: background 0.12s ease;
+
+  &:last-of-type { border-bottom: none; }
+  &:hover { background: #f8fbff; text-decoration: none; }
+}
+
+.bookingTimeBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  min-width: 52px;
+  gap: 0.15rem;
+  background: rgba(139, 92, 246, 0.08);
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.25rem;
+  flex-shrink: 0;
+
+  i {
+    font-size: 0.8rem;
+    color: #8b5cf6;
+  }
+
+  span {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #8b5cf6;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
+
+.bookingBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+}
+
+.booking_reserved {
+  color: #0369a1;
+  background: #e0f2fe;
+  border-color: rgba(3, 105, 161, 0.18);
+}
+
+.booking_finished {
+  color: #15803d;
+  background: #dcfce7;
+  border-color: rgba(21, 128, 61, 0.18);
+}
+
+.booking_cancelled {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: rgba(185, 28, 28, 0.18);
 }
 
 // ─── No clinic ────────────────────────────────────────────────────────────────

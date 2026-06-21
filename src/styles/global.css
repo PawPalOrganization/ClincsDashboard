@@ -15,6 +15,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
+  overflow-x: hidden; /* prevent any content from causing page-level horizontal scroll */
 }
 
 #root {
