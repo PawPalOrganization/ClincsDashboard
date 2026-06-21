@@ -1,0 +1,29 @@
+// Selective Bootstrap 5 import — only modules actually used in PawClinics.
+// Skips: buttons, forms, modals, navbar, cards, badges, pagination, breadcrumbs,
+// progress, spinners, accordion, carousel, offcanvas, toast, tables, popovers, etc.
+// Estimated savings vs full bootstrap.min.css: ~180 KB
+
+// ── 1. Required Bootstrap internals ──────────────────────────────────────────
+@import 'bootstrap/scss/functions';
+@import 'bootstrap/scss/variables';
+@import 'bootstrap/scss/variables-dark';
+@import 'bootstrap/scss/maps';
+@import 'bootstrap/scss/mixins';
+@import 'bootstrap/scss/utilities';
+
+// ── 2. Base / reset ───────────────────────────────────────────────────────────
+@import 'bootstrap/scss/root';          // :root CSS custom properties
+@import 'bootstrap/scss/reboot';        // cross-browser normalize
+
+// ── 3. Layout — container-fluid, row, col-*, g-* ─────────────────────────────
+@import 'bootstrap/scss/containers';
+@import 'bootstrap/scss/grid';
+
+// ── 4. Components ─────────────────────────────────────────────────────────────
+@import 'bootstrap/scss/alert';         // .alert .alert-danger .alert-info .alert-warning
+
+// ── 5. Utility classes ────────────────────────────────────────────────────────
+// Generates: d-flex, d-none, d-lg-flex, align-items-*, justify-content-*,
+//            mb-*, mx-*, my-*, px-*, py-*, fw-bold, text-center, text-muted,
+//            w-100, position-relative, and all other Bootstrap utility classes.
+@import 'bootstrap/scss/utilities/api';

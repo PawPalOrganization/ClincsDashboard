@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import styles from './PawLoader.module.css';
 
 type Size = 'small' | 'medium' | 'large';
@@ -103,11 +104,12 @@ export default function PawLoader({
   const px = SIZE_PX[size];
 
   if (overlay) {
-    return (
+    return createPortal(
       <div className={styles.overlay}>
         <PawSVG px={px} color={color} />
         {label && <span className={styles.overlayLabel}>{label}</span>}
-      </div>
+      </div>,
+      document.body,
     );
   }
 

@@ -55,6 +55,14 @@ export default function Login() {
   const [errors, setErrors]             = useState<FormErrors>({});
   const [loading, setLoading]           = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [failCount, setFailCount]       = useState(0);
+  const [cooldown, setCooldown]         = useState(0); // seconds remaining
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
@@ -86,7 +94,7 @@ export default function Login() {
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (cooldown > 0 || !validateForm()) return;
 
     setLoading(true);
     setErrors({});
@@ -100,6 +108,12 @@ export default function Login() {
           ? err.message
           : 'Login failed. Please check your credentials.';
       setErrors({ form: message });
+      const next = failCount + 1;
+      setFailCount(next);
+      if (next >= 5) {
+        setCooldown(30);
+        setFailCount(0);
+      }
     } finally {
       setLoading(false);
     }
@@ -223,9 +237,9 @@ export default function Login() {
                     variant="primary"
                     size="large"
                     fullWidth
-                    disabled={loading}
+                    disabled={loading || cooldown > 0}
                   >
-                    Log in
+                    {cooldown > 0 ? `Try again in ${cooldown}s` : 'Log in'}
                   </Button>
                 </form>
               </div>

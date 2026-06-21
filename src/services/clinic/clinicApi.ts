@@ -100,7 +100,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
       }
       if (details) message = `${message}: ${details}`;
     }
-    console.error('[API Error]', response.status, JSON.stringify(body));
+    if (import.meta.env.DEV) {
+      console.error('[API Error]', response.status, JSON.stringify(body));
+    }
     throw new ApiError(response.status, message);
   }
 

@@ -50,7 +50,7 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
     setToasts((prev) => prev.filter((t) => t.key !== key));
   }
 
-  async function loadNotifications() {
+  const loadNotifications = useCallback(async () => {
     try {
       const res = await clinicNotificationService.list({ limit: 10 });
       const items = res.items;
@@ -75,13 +75,13 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
           ?? items.filter((n) => !n.isRead).length,
       );
     } catch {}
-  }
+  }, []);
 
   useEffect(() => {
     loadNotifications();
     const interval = setInterval(loadNotifications, 60_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadNotifications]);
 
   // ── Pusher real-time notifications ────────────────────────────────────────
   const handlePusherNotification = useCallback((n: ClinicNotification) => {
@@ -119,25 +119,26 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
     } catch {}
   }
 
-  // ── Clinic profile ─────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!clinicId) return;
-    clinicProfileService.get(clinicId).then(setClinic).catch(() => {});
-  }, [clinicId]);
-
-  useEffect(() => {
-    document.title = clinic?.title ? `${clinic.title} | PawPal` : 'PawPal Clinics';
-    return () => { document.title = 'PawPal Clinics'; };
-  }, [clinic?.title]);
+  // ── Clinic profile + tab title + favicon (single effect, one render cycle) ──
 
   useEffect(() => {
     const link = (document.querySelector("link[rel~='icon']") as HTMLLinkElement)
       ?? Object.assign(document.createElement('link'), { rel: 'icon' });
     if (!link.parentNode) document.head.appendChild(link);
-    link.href = clinic?.logoUrl ?? '/favicon.ico';
-    return () => { link.href = '/favicon.ico'; };
-  }, [clinic?.logoUrl]);
+
+    if (!clinicId) return;
+
+    clinicProfileService.get(clinicId).then((c) => {
+      setClinic(c);
+      document.title = c.title ? `${c.title} | PawPal` : 'PawPal Clinics';
+      link.href = c.logoUrl ?? '/favicon.ico';
+    }).catch(() => {});
+
+    return () => {
+      document.title = 'PawPal Clinics';
+      link.href = '/favicon.ico';
+    };
+  }, [clinicId]);
 
   const visibleNavItems = NAV_ITEMS.filter(
     (item) => !item.permission || hasClinicPermission(staff, item.permission),

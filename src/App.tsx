@@ -1,26 +1,31 @@
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, Link, Outlet } from 'react-router-dom';
 import { ClinicAuthProvider } from './context/ClinicAuthContext';
 import { useClinicAuth } from './context/ClinicAuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import ClinicLayout from './components/layout/ClinicLayout/ClinicLayout';
 import PawLoader from './components/common/PawLoader/PawLoader';
+
+// Static imports — always needed immediately
 import Login from './pages/Login/Login';
-import ClinicDashboard from './pages/Dashboard/ClinicDashboard';
-import ClinicSettings from './pages/Settings/ClinicSettings';
-import BranchesList from './pages/Branches/BranchesList';
-import CreateBranch from './pages/Branches/CreateBranch';
-import EditBranch from './pages/Branches/EditBranch';
-import StaffList from './pages/Staff/StaffList';
-import CreateStaff from './pages/Staff/CreateStaff';
-import EditStaff from './pages/Staff/EditStaff';
-import DoctorList from './pages/Staff/DoctorList';
-import CreateDoctor from './pages/Staff/CreateDoctor';
-import DoctorInfo from './pages/Staff/DoctorInfo';
-import AppointmentsList from './pages/Appointments/AppointmentsList';
-import TodayQueue from './pages/Appointments/TodayQueue';
-import CreateAppointment from './pages/Appointments/CreateAppointment';
-import AppointmentDetail from './pages/Appointments/AppointmentDetail';
-import ServicesList from './pages/Services/ServicesList';
+
+// Lazy page chunks — each becomes its own JS file, loaded only when navigated to
+const ClinicDashboard    = lazy(() => import('./pages/Dashboard/ClinicDashboard'));
+const ClinicSettings     = lazy(() => import('./pages/Settings/ClinicSettings'));
+const BranchesList       = lazy(() => import('./pages/Branches/BranchesList'));
+const CreateBranch       = lazy(() => import('./pages/Branches/CreateBranch'));
+const EditBranch         = lazy(() => import('./pages/Branches/EditBranch'));
+const StaffList          = lazy(() => import('./pages/Staff/StaffList'));
+const CreateStaff        = lazy(() => import('./pages/Staff/CreateStaff'));
+const EditStaff          = lazy(() => import('./pages/Staff/EditStaff'));
+const DoctorList         = lazy(() => import('./pages/Staff/DoctorList'));
+const CreateDoctor       = lazy(() => import('./pages/Staff/CreateDoctor'));
+const DoctorInfo         = lazy(() => import('./pages/Staff/DoctorInfo'));
+const AppointmentsList   = lazy(() => import('./pages/Appointments/AppointmentsList'));
+const TodayQueue         = lazy(() => import('./pages/Appointments/TodayQueue'));
+const CreateAppointment  = lazy(() => import('./pages/Appointments/CreateAppointment'));
+const AppointmentDetail  = lazy(() => import('./pages/Appointments/AppointmentDetail'));
+const ServicesList       = lazy(() => import('./pages/Services/ServicesList'));
 
 // ─── Root redirect ─────────────────────────────────────────────────────────
 // Reads auth state and sends the user to the right place.
@@ -94,22 +99,25 @@ export default function App() {
           {/* Protected routes — guarded by ProtectedRoute, wrapped by ClinicLayout */}
           <Route element={<ProtectedRoute />}>
             <Route element={<ClinicLayout />}>
-              <Route path="/dashboard"           element={<ClinicDashboard />} />
-              <Route path="/branches"            element={<BranchesList />} />
-              <Route path="/branches/create"     element={<CreateBranch />} />
-              <Route path="/branches/:branchId"  element={<EditBranch />} />
-              <Route path="/staff"               element={<StaffList />} />
-              <Route path="/staff/create"        element={<CreateStaff />} />
-              <Route path="/staff/doctors"          element={<DoctorList />} />
-              <Route path="/staff/doctors/create"   element={<CreateDoctor />} />
-              <Route path="/staff/doctors/:staffId" element={<DoctorInfo />} />
-              <Route path="/staff/:staffId"      element={<EditStaff />} />
-              <Route path="/appointments"          element={<AppointmentsList />} />
-              <Route path="/appointments/today"  element={<TodayQueue />} />
-              <Route path="/appointments/create" element={<CreateAppointment />} />
-              <Route path="/appointments/:id"    element={<AppointmentDetail />} />
-              <Route path="/services"            element={<ServicesList />} />
-              <Route path="/settings"            element={<ClinicSettings />} />
+              {/* Suspense wrapper — shows PawLoader while any lazy page chunk loads */}
+              <Route element={<Suspense fallback={<PawLoader size="large" overlay />}><Outlet /></Suspense>}>
+                <Route path="/dashboard"           element={<ClinicDashboard />} />
+                <Route path="/branches"            element={<BranchesList />} />
+                <Route path="/branches/create"     element={<CreateBranch />} />
+                <Route path="/branches/:branchId"  element={<EditBranch />} />
+                <Route path="/staff"               element={<StaffList />} />
+                <Route path="/staff/create"        element={<CreateStaff />} />
+                <Route path="/staff/doctors"          element={<DoctorList />} />
+                <Route path="/staff/doctors/create"   element={<CreateDoctor />} />
+                <Route path="/staff/doctors/:staffId" element={<DoctorInfo />} />
+                <Route path="/staff/:staffId"      element={<EditStaff />} />
+                <Route path="/appointments"          element={<AppointmentsList />} />
+                <Route path="/appointments/today"  element={<TodayQueue />} />
+                <Route path="/appointments/create" element={<CreateAppointment />} />
+                <Route path="/appointments/:id"    element={<AppointmentDetail />} />
+                <Route path="/services"            element={<ServicesList />} />
+                <Route path="/settings"            element={<ClinicSettings />} />
+              </Route>
             </Route>
           </Route>
 
