@@ -8,10 +8,8 @@ import type {
   ApiResponse,
   Appointment,
   Clinic,
-  ClinicBranch,
   ClinicStaff,
   PaginatedList,
-  PaginatedResponse,
 } from '../../types/clinic.types';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
 import styles from './ClinicDashboard.module.scss';
@@ -142,7 +140,6 @@ export default function ClinicDashboard() {
 
   const [loading, setLoading]                     = useState(true);
   const [clinic, setClinic]                       = useState<Clinic | null>(null);
-  const [branches, setBranches]                   = useState<ClinicBranch[]>([]);
   const [totalBranches, setTotalBranches]         = useState(0);
   const [totalStaff, setTotalStaff]               = useState(0);
   const [todayBookings, setTodayBookings]         = useState<Appointment[]>([]);
@@ -168,7 +165,7 @@ export default function ClinicDashboard() {
 
       const [clinicRes, branchesRes, staffRes, bookingsRes] = await Promise.allSettled([
         canViewClinic        ? clinicApi.get<ApiResponse<Clinic>>(`/clinics/${clinicId}`) : SKIP,
-        canViewBranches      ? clinicApi.get<PaginatedResponse<ClinicBranch>>(`/clinics/${clinicId}/branches`) : SKIP,
+        canViewBranches      ? clinicApi.get<ApiResponse<{ items: unknown[]; meta: { total: number } } | unknown[]>>(`/clinics/${clinicId}/branches`) : SKIP,
         canViewStaff         ? clinicApi.get<{ data: { meta?: { total: number }; items?: ClinicStaff[] } | ClinicStaff[] }>('/clinic-staff', { page: 1, limit: 1 }) : SKIP,
         canViewAppointments  ? clinicAppointmentService.list({ date: today, limit: 5, page: 1 }) : SKIP,
       ]);
@@ -185,10 +182,8 @@ export default function ClinicDashboard() {
 
       if (canViewBranches) {
         if (branchesRes.status === 'fulfilled' && branchesRes.value) {
-          const raw = (branchesRes.value as PaginatedResponse<ClinicBranch>).data;
-          const items = Array.isArray(raw) ? (raw as ClinicBranch[]) : raw.items;
-          const count = Array.isArray(raw) ? raw.length : raw.meta.total;
-          setBranches(items);
+          const raw = (branchesRes.value as ApiResponse<{ items: unknown[]; meta: { total: number } } | unknown[]>).data;
+          const count = Array.isArray(raw) ? (raw as unknown[]).length : (raw as { meta: { total: number } }).meta.total;
           setTotalBranches(count);
         } else if (branchesRes.status === 'rejected') {
           nextErrors.branches = 'Could not load branches.';
