@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ClinicStaff } from '../types/clinic.types';
+import type { ApiResponse, ClinicStaff } from '../types/clinic.types';
 import clinicAuthService from '../services/clinic/clinicAuthService';
+import clinicApi, { ApiError } from '../services/clinic/clinicApi';
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -42,25 +43,54 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<ClinicAuthState>(INITIAL_STATE);
 
   // Hydrate auth state from localStorage on mount.
-  // isLoading stays true until this completes, preventing a flash of /login.
+  // Validates the stored token against the server and uses the server-provided
+  // staff object (eliminating S-2/S-3 client-side permission tampering risk).
+  // Falls back to localStorage staff when /auth/me is not yet deployed (404).
+  // 401 is handled automatically by clinicApi (clears session + redirects).
   useEffect(() => {
-    try {
-      const stored = clinicAuthService.getStoredAuth();
-      if (stored) {
+    const stored = clinicAuthService.getStoredAuth();
+    if (!stored) {
+      setState((prev) => ({ ...prev, isLoading: false }));
+      return;
+    }
+
+    // AbortController lets React StrictMode's cleanup cancel the in-flight request
+    // before the second (real) mount fires, preventing double-fetch and state races.
+    const controller = new AbortController();
+
+    clinicApi.get<ApiResponse<ClinicStaff>>('/auth/me', undefined, { signal: controller.signal })
+      .then((res) => {
         setState({
-          staff: stored.staff,
+          staff: res.data,
           token: stored.token,
           clinicId: stored.clinicId,
           branchId: stored.branchId,
           isAuthenticated: true,
           isLoading: false,
         });
-      } else {
+      })
+      .catch((err) => {
+        // Effect was cleaned up (StrictMode unmount or fast navigation) — do nothing
+        if (controller.signal.aborted) return;
+
+        // 404 = /auth/me not yet deployed on backend — use cached staff as fallback
+        if (err instanceof ApiError && err.status === 404) {
+          setState({
+            staff: stored.staff,
+            token: stored.token,
+            clinicId: stored.clinicId,
+            branchId: stored.branchId,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+          return;
+        }
+        // Any other error (network failure, etc.) — log out for safety
+        clinicAuthService.logout();
         setState((prev) => ({ ...prev, isLoading: false }));
-      }
-    } catch {
-      setState((prev) => ({ ...prev, isLoading: false }));
-    }
+      });
+
+    return () => controller.abort();
   }, []);
 
   // Calls the service, then mirrors the result into React state.

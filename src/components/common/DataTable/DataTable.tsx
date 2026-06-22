@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { ReactNode } from 'react';
 import TablePageSkeleton from '../Skeleton/TablePageSkeleton';
 import styles from './DataTable.module.scss';
@@ -27,7 +28,7 @@ interface DataTableProps<T extends DataRow> {
   emptyMessage?: string;
 }
 
-export default function DataTable<T extends DataRow>({
+function DataTableInner<T extends DataRow>({
   columns,
   data,
   loading = false,
@@ -186,3 +187,7 @@ export default function DataTable<T extends DataRow>({
     </div>
   );
 }
+
+// memo wrapper — generic components can't be directly passed to memo, so we cast
+const DataTable = memo(DataTableInner) as typeof DataTableInner;
+export default DataTable;

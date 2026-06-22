@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
@@ -67,7 +67,7 @@ export default function AppointmentsList() {
   const [page, setPage] = useState(1);
 
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const debouncedSearch = useDeferredValue(search);
   const [filterBranch, setFilterBranch] = useState('');
   const [filterStatus, setFilterStatus] = useState<AppointmentStatus | ''>('');
   const [filterDate, setFilterDate] = useState('');
@@ -77,15 +77,7 @@ export default function AppointmentsList() {
   const [loadingBranches, setLoadingBranches] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      setDebouncedSearch(search.trim());
-      setPage(1);
-    }, 300);
-    return () => window.clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => { setPage(1); }, [filterBranch, filterStatus, filterDate]);
+  useEffect(() => { setPage(1); }, [filterBranch, filterStatus, filterDate, debouncedSearch]);
 
   useEffect(() => {
     if (!clinicId) { setLoadingBranches(false); return; }
@@ -105,7 +97,7 @@ export default function AppointmentsList() {
         branchId: filterBranch || undefined,
         status: (filterStatus as AppointmentStatus) || undefined,
         date: filterDate || undefined,
-        name: debouncedSearch || undefined,
+        name: debouncedSearch.trim() || undefined,
       });
       setAppointments(result.items as AppRow[]);
       setTotal(result.meta.total);
@@ -273,7 +265,7 @@ export default function AppointmentsList() {
               className={styles.searchInput}
               placeholder="Search by patient name"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => setSearch(e.target.value)}
             />
             {search && (
               <button type="button" className={styles.clearSearch} onClick={() => setSearch('')} aria-label="Clear">
@@ -324,7 +316,7 @@ export default function AppointmentsList() {
         onPageChange={setPage}
         onEdit={(row) => navigate(`/appointments/${row.id}`)}
         emptyMessage={
-          debouncedSearch || filterBranch || filterStatus || filterDate
+          debouncedSearch.trim() || filterBranch || filterStatus || filterDate
             ? 'No appointments match your filters.'
             : 'No appointments found.'
         }

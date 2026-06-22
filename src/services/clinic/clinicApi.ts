@@ -100,7 +100,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
       }
       if (details) message = `${message}: ${details}`;
     }
-    if (import.meta.env.DEV) {
+    // 404 is a valid "not found" HTTP status handled by callers — not a server bug
+    if (import.meta.env.DEV && response.status !== 404) {
       console.error('[API Error]', response.status, JSON.stringify(body));
     }
     throw new ApiError(response.status, message);
@@ -112,10 +113,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // ─── API client ───────────────────────────────────────────────────────────────
 
 const clinicApi = {
-  async get<T>(path: string, params?: QueryParams): Promise<T> {
+  async get<T>(path: string, params?: QueryParams, opts?: { signal?: AbortSignal }): Promise<T> {
     const response = await fetch(buildUrl(path, params), {
       method: 'GET',
       headers: buildHeaders(),
+      signal: opts?.signal,
     });
     return handleResponse<T>(response);
   },

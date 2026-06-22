@@ -3,7 +3,7 @@ import { render, waitFor, act } from '@testing-library/react';
 import { ClinicAuthProvider, useClinicAuth } from './ClinicAuthContext';
 import clinicAuthService from '../services/clinic/clinicAuthService';
 import type { StoredAuth } from '../services/clinic/clinicAuthService';
-import { makeStaff } from '../test/factories';
+import { makeStaff, mockFetchOk, mockFetchError } from '../test/factories';
 
 // ─── Helper: renders the provider and exposes context value via a test component
 
@@ -41,7 +41,10 @@ describe('ClinicAuthProvider hydration', () => {
     expect(ctx.token).toBeNull();
   });
 
-  it('is authenticated when stored auth is present', async () => {
+  it('is authenticated when stored auth is present and /auth/me succeeds', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      mockFetchOk({ data: makeStaff() }),
+    );
     const storedAuth: StoredAuth = {
       token: 'stored-token',
       staff: makeStaff(),
@@ -54,6 +57,27 @@ describe('ClinicAuthProvider hydration', () => {
     await waitFor(() => expect(ctx.isAuthenticated).toBe(true));
     expect(ctx.token).toBe('stored-token');
     expect(ctx.clinicId).toBe('5');
+    expect(ctx.staff?.email).toBe('jane@clinic.com');
+  });
+
+  it('falls back to stored staff when /auth/me returns 404 (endpoint not yet deployed)', async () => {
+    Object.defineProperty(window, 'location', {
+      value: { pathname: '/dashboard', href: '' },
+      writable: true,
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      mockFetchError(404, { message: 'Not Found' }),
+    );
+    const storedAuth: StoredAuth = {
+      token: 'stored-token',
+      staff: makeStaff(),
+      clinicId: '5',
+      branchId: '10',
+    };
+    vi.spyOn(clinicAuthService, 'getStoredAuth').mockReturnValue(storedAuth);
+    let ctx!: ReturnType<typeof useClinicAuth>;
+    renderProvider((c) => { ctx = c; });
+    await waitFor(() => expect(ctx.isAuthenticated).toBe(true));
     expect(ctx.staff?.email).toBe('jane@clinic.com');
   });
 });
@@ -118,6 +142,9 @@ describe('ClinicAuthProvider login', () => {
 
 describe('ClinicAuthProvider logout', () => {
   it('clears auth state after logout', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      mockFetchOk({ data: makeStaff() }),
+    );
     const storedAuth: StoredAuth = {
       token: 'tok',
       staff: makeStaff(),

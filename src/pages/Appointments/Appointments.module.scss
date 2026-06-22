@@ -400,6 +400,27 @@
   gap: 0;
   margin-bottom: 1.75rem;
   border-bottom: 2px solid #e4e7ec;
+
+  // ── Mobile: compact bubble track, no text labels ───────────────────────────
+  @media (max-width: 520px) {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding: 0.5rem 0.5rem;
+    position: relative;
+    justify-content: space-between;
+
+    // Gray connector line behind all circles
+    &::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 1.75rem;
+      right: 1.75rem;
+      height: 2px;
+      background: #e4e7ec;
+      transform: translateY(-50%);
+    }
+  }
 }
 
 .step {
@@ -412,11 +433,51 @@
   color: #9ca3af;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
+
+  @media (max-width: 520px) {
+    flex: 1;
+    justify-content: center;
+    padding: 0.35rem 0;
+    border-bottom: none;
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.stepLabel {
+  // Visible on ≥ 521 px
+  @media (max-width: 520px) {
+    display: none;
+  }
+}
+
+// Mobile-only subtitle shown below the bubble track
+.stepperMobileLabel {
+  display: none;
+
+  @media (max-width: 520px) {
+    display: block;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #6b7280;
+    margin-bottom: 1.5rem;
+    letter-spacing: 0.01em;
+
+    strong {
+      color: var(--color-primary, #0d9aff);
+      font-weight: 600;
+    }
+  }
 }
 
 .stepActive {
   color: var(--color-primary, #0d9aff);
   border-bottom-color: var(--color-primary, #0d9aff);
+
+  @media (max-width: 520px) {
+    border-bottom-color: transparent;
+  }
 }
 
 .stepDone {
@@ -444,6 +505,15 @@
   .stepDone & {
     background: #dcfce7;
     color: #15803d;
+  }
+
+  // Slightly larger on mobile so they're easy to tap/read
+  @media (max-width: 520px) {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+    // Must be opaque to visually "cut through" the connector line
+    box-shadow: 0 0 0 3px #f5f6f8;
   }
 }
 

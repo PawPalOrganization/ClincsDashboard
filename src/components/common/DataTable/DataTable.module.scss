@@ -19,19 +19,18 @@
   -webkit-overflow-scrolling: touch; // Smooth scrolling on iOS
   position: relative;
 
-  // Scroll fade indicator on tablets and mobile (shows there's more content)
+  // Scroll fade indicator — absolute so it never contributes to scroll width.
+  // float: right inside overflow-x: auto extends scroll width in Edge; position: absolute does not.
   @media (max-width: 991px) {
     &::after {
       content: '';
-      position: sticky;
+      position: absolute;
       right: 0;
       top: 0;
       bottom: 0;
       width: 40px;
       background: linear-gradient(to left, rgba(255, 255, 255, 0.9), transparent);
       pointer-events: none;
-      float: right;
-      height: 100%;
     }
   }
 

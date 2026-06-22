@@ -3,6 +3,7 @@
   min-height: 100vh;
   background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
   position: relative;
+  overflow-x: hidden; /* stop any child (tables, cards) from pushing the page wider than the viewport */
 }
 
 // ─── Hamburger button ─────────────────────────────────────────────────────────

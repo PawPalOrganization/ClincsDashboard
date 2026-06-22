@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicApi from '../../services/clinic/clinicApi';
@@ -128,6 +128,38 @@ function NoClinic() {
   );
 }
 
+// ─── StatCard ─────────────────────────────────────────────────────────────────
+
+interface StatCardProps {
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  value: number;
+  label: string;
+  error?: string;
+  emptyLabel?: string;
+}
+
+const StatCard = memo(function StatCard({
+  icon, iconBg, iconColor, value, label, error, emptyLabel,
+}: StatCardProps) {
+  return (
+    <div className={styles.statCard}>
+      <div className={styles.statIcon} style={{ background: iconBg, color: iconColor }}>
+        <i className={`bi ${icon}`} />
+      </div>
+      {error ? (
+        <div className={styles.statNoData}>No data to display</div>
+      ) : value === 0 ? (
+        <div className={styles.statNoData}>{emptyLabel ?? 'No data yet'}</div>
+      ) : (
+        <div className={styles.statNumber}>{value}</div>
+      )}
+      <div className={styles.statLabel}>{label}</div>
+    </div>
+  );
+});
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ClinicDashboard() {
@@ -138,7 +170,8 @@ export default function ClinicDashboard() {
   const canViewStaff         = hasClinicPermission(authStaff, 'clinic-staff.read');
   const canViewAppointments  = hasClinicPermission(authStaff, 'appointments.read');
 
-  const [loading, setLoading]                     = useState(true);
+  const [loadingStats, setLoadingStats]           = useState(true);
+  const [loadingBookings, setLoadingBookings]     = useState(true);
   const [clinic, setClinic]                       = useState<Clinic | null>(null);
   const [totalBranches, setTotalBranches]         = useState(0);
   const [totalStaff, setTotalStaff]               = useState(0);
@@ -155,21 +188,20 @@ export default function ClinicDashboard() {
 
   useEffect(() => {
     if (!clinicId) {
-      setLoading(false);
+      setLoadingStats(false);
+      setLoadingBookings(false);
       return;
     }
 
-    async function load() {
-      const SKIP  = Promise.resolve(null);
-      const today = new Date().toISOString().split('T')[0];
+    const SKIP  = Promise.resolve(null);
+    const today = new Date().toISOString().split('T')[0];
 
-      const [clinicRes, branchesRes, staffRes, bookingsRes] = await Promise.allSettled([
-        canViewClinic        ? clinicApi.get<ApiResponse<Clinic>>(`/clinics/${clinicId}`) : SKIP,
-        canViewBranches      ? clinicApi.get<ApiResponse<{ items: unknown[]; meta: { total: number } } | unknown[]>>(`/clinics/${clinicId}/branches`) : SKIP,
-        canViewStaff         ? clinicApi.get<{ data: { meta?: { total: number }; items?: ClinicStaff[] } | ClinicStaff[] }>('/clinic-staff', { page: 1, limit: 1 }) : SKIP,
-        canViewAppointments  ? clinicAppointmentService.list({ date: today, limit: 5, page: 1 }) : SKIP,
-      ]);
-
+    // ── Stats (clinic + branches + staff) — shown as soon as these three resolve ──
+    Promise.allSettled([
+      canViewClinic   ? clinicApi.get<ApiResponse<Clinic>>(`/clinics/${clinicId}`) : SKIP,
+      canViewBranches ? clinicApi.get<ApiResponse<{ items: unknown[]; meta: { total: number } } | unknown[]>>(`/clinics/${clinicId}/branches`) : SKIP,
+      canViewStaff    ? clinicApi.get<{ data: { meta?: { total: number }; items?: ClinicStaff[] } | ClinicStaff[] }>('/clinic-staff', { page: 1, limit: 1 }) : SKIP,
+    ]).then(([clinicRes, branchesRes, staffRes]) => {
       const nextErrors: typeof errors = {};
 
       if (canViewClinic) {
@@ -200,24 +232,29 @@ export default function ClinicDashboard() {
         }
       }
 
-      if (canViewAppointments) {
-        if (bookingsRes.status === 'fulfilled' && bookingsRes.value) {
-          const result = bookingsRes.value as PaginatedList<Appointment>;
-          setTodayBookings(result.items);
-          setTotalTodayBookings(result.meta.total);
-        } else if (bookingsRes.status === 'rejected') {
-          nextErrors.appointments = "Could not load today's appointments.";
+      setErrors((prev) => ({ ...prev, ...nextErrors }));
+      setLoadingStats(false);
+    });
+
+    // ── Bookings — resolves independently, shows inline skeleton until done ──
+    (canViewAppointments
+      ? clinicAppointmentService.list({ date: today, limit: 5, page: 1 })
+      : Promise.resolve(null)
+    )
+      .then((result) => {
+        if (result) {
+          setTodayBookings((result as PaginatedList<Appointment>).items);
+          setTotalTodayBookings((result as PaginatedList<Appointment>).meta.total);
         }
-      }
+      })
+      .catch(() => {
+        setErrors((prev) => ({ ...prev, appointments: "Could not load today's appointments." }));
+      })
+      .finally(() => setLoadingBookings(false));
 
-      setErrors(nextErrors);
-      setLoading(false);
-    }
-
-    load();
   }, [clinicId, canViewClinic, canViewBranches, canViewStaff, canViewAppointments]);
 
-  if (loading) return <DashboardSkeleton />;
+  if (loadingStats) return <DashboardSkeleton />;
   if (!clinicId) return <NoClinic />;
 
   const canViewSettings = hasClinicPermission(authStaff, 'clinics.read');
@@ -283,53 +320,38 @@ export default function ClinicDashboard() {
 
       {/* ── Stats ── */}
       <div className={styles.statsGrid}>
-
         {canViewBranches && (
-          <div className={styles.statCard}>
-            <div className={styles.statIcon} style={{ background: 'rgba(13,154,255,0.10)', color: '#0d9aff' }}>
-              <i className="bi bi-building" />
-            </div>
-            {errors.branches ? (
-              <div className={styles.statNoData}>No data to display</div>
-            ) : totalBranches === 0 ? (
-              <div className={styles.statNoData}>No branches yet</div>
-            ) : (
-              <div className={styles.statNumber}>{totalBranches}</div>
-            )}
-            <div className={styles.statLabel}>Branches</div>
-          </div>
+          <StatCard
+            icon="bi-building"
+            iconBg="rgba(13,154,255,0.10)"
+            iconColor="#0d9aff"
+            value={totalBranches}
+            label="Branches"
+            error={errors.branches}
+            emptyLabel="No branches yet"
+          />
         )}
-
         {canViewStaff && (
-          <div className={styles.statCard}>
-            <div className={styles.statIcon} style={{ background: 'rgba(16,185,129,0.10)', color: '#10b981' }}>
-              <i className="bi bi-people-fill" />
-            </div>
-            {errors.staff ? (
-              <div className={styles.statNoData}>No data to display</div>
-            ) : totalStaff === 0 ? (
-              <div className={styles.statNoData}>No staff yet</div>
-            ) : (
-              <div className={styles.statNumber}>{totalStaff}</div>
-            )}
-            <div className={styles.statLabel}>Staff Members</div>
-          </div>
+          <StatCard
+            icon="bi-people-fill"
+            iconBg="rgba(16,185,129,0.10)"
+            iconColor="#10b981"
+            value={totalStaff}
+            label="Staff Members"
+            error={errors.staff}
+            emptyLabel="No staff yet"
+          />
         )}
-
         {canViewAppointments && (
-          <div className={styles.statCard}>
-            <div className={styles.statIcon} style={{ background: 'rgba(139,92,246,0.10)', color: '#8b5cf6' }}>
-              <i className="bi bi-calendar2-check-fill" />
-            </div>
-            {errors.appointments ? (
-              <div className={styles.statNoData}>No data</div>
-            ) : (
-              <div className={styles.statNumber}>{totalTodayBookings}</div>
-            )}
-            <div className={styles.statLabel}>Appointments Today</div>
-          </div>
+          <StatCard
+            icon="bi-calendar2-check-fill"
+            iconBg="rgba(139,92,246,0.10)"
+            iconColor="#8b5cf6"
+            value={totalTodayBookings}
+            label="Appointments Today"
+            error={errors.appointments}
+          />
         )}
-
       </div>
 
       {/* ── Quick actions ── */}
@@ -362,20 +384,37 @@ export default function ClinicDashboard() {
           </div>
 
           <div className={styles.staffCard}>
-            {errors.appointments && (
+            {loadingBookings && (
+              <>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className={styles.staffRow}>
+                    <Skeleton variant="circular" width="38px" height="38px" />
+                    <div className={styles.staffInfo}>
+                      <Skeleton width="140px" height="14px" />
+                      <div style={{ marginTop: '6px' }}>
+                        <Skeleton width="100px" height="12px" />
+                      </div>
+                    </div>
+                    <Skeleton width="70px" height="22px" />
+                  </div>
+                ))}
+              </>
+            )}
+
+            {!loadingBookings && errors.appointments && (
               <div className={styles.staffError}>
                 <i className="bi bi-exclamation-circle" /> {errors.appointments}
               </div>
             )}
 
-            {!errors.appointments && todayBookings.length === 0 && (
+            {!loadingBookings && !errors.appointments && todayBookings.length === 0 && (
               <div className={styles.emptyState}>
                 <i className="bi bi-calendar2-x" />
                 <p>No appointments scheduled for today.</p>
               </div>
             )}
 
-            {!errors.appointments && todayBookings.map((booking) => (
+            {!loadingBookings && !errors.appointments && todayBookings.map((booking) => (
               <Link
                 key={booking.id}
                 to={`/appointments/${booking.id}`}
@@ -397,7 +436,7 @@ export default function ClinicDashboard() {
               </Link>
             ))}
 
-            {!errors.appointments && totalTodayBookings > 5 && (
+            {!loadingBookings && !errors.appointments && totalTodayBookings > 5 && (
               <Link to="/appointments" className={styles.viewAll}>
                 View all {totalTodayBookings} appointments today
                 <i className="bi bi-arrow-right" />

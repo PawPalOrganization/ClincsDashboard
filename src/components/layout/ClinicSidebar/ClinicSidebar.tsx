@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useClinicAuth } from '../../../context/ClinicAuthContext';
 import { hasClinicPermission } from '../../../utils/clinicPermissions';
 import type { ClinicPermissionSlug } from '../../../utils/clinicPermissions';
@@ -8,7 +9,7 @@ import clinicNotificationService from '../../../services/clinic/clinicNotificati
 import { useClinicPusher } from '../../../hooks/useClinicPusher';
 import NotificationToast from '../../common/NotificationToast/NotificationToast';
 import type { ToastItem } from '../../common/NotificationToast/NotificationToast';
-import type { Clinic, ClinicNotification } from '../../../types/clinic.types';
+import type { ClinicNotification } from '../../../types/clinic.types';
 import styles from './ClinicSidebar.module.scss';
 
 interface ClinicSidebarProps {
@@ -34,7 +35,15 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
   const { staff, clinicId, token, branchId, logout } = useClinicAuth();
-  const [clinic, setClinic] = useState<Clinic | null>(null);
+
+  // React Query caches the clinic profile — sidebar remounts on mobile will
+  // return the cached value instantly instead of refetching every time.
+  const { data: clinic } = useQuery({
+    queryKey: ['clinicProfile', clinicId],
+    queryFn: () => clinicProfileService.get(clinicId!),
+    enabled: !!clinicId,
+    staleTime: 60_000,
+  });
 
   // ── Notifications ──────────────────────────────────────────────────────────
   const [notifications, setNotifications] = useState<ClinicNotification[]>([]);
@@ -119,26 +128,23 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
     } catch {}
   }
 
-  // ── Clinic profile + tab title + favicon (single effect, one render cycle) ──
+  // ── Tab title + favicon — side effects driven by React Query's clinic data ──
 
   useEffect(() => {
     const link = (document.querySelector("link[rel~='icon']") as HTMLLinkElement)
       ?? Object.assign(document.createElement('link'), { rel: 'icon' });
     if (!link.parentNode) document.head.appendChild(link);
 
-    if (!clinicId) return;
-
-    clinicProfileService.get(clinicId).then((c) => {
-      setClinic(c);
-      document.title = c.title ? `${c.title} | PawPal` : 'PawPal Clinics';
-      link.href = c.logoUrl ?? '/favicon.ico';
-    }).catch(() => {});
+    if (clinic) {
+      document.title = clinic.title ? `${clinic.title} | PawPal` : 'PawPal Clinics';
+      link.href = clinic.logoUrl ?? '/favicon.ico';
+    }
 
     return () => {
       document.title = 'PawPal Clinics';
       link.href = '/favicon.ico';
     };
-  }, [clinicId]);
+  }, [clinic]);
 
   const visibleNavItems = NAV_ITEMS.filter(
     (item) => !item.permission || hasClinicPermission(staff, item.permission),
@@ -245,6 +251,7 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
                       }
                     }}
                   >
+                    {/* Plain text only — do NOT change to dangerouslySetInnerHTML */}
                     <div className={styles.notifTitle}>{n.title}</div>
                     <div className={styles.notifBody}>{n.body}</div>
                     <div className={styles.notifTime}>

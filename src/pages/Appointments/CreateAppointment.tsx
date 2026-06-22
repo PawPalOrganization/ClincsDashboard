@@ -248,10 +248,14 @@ export default function CreateAppointment() {
             return (
               <div key={n} className={`${styles.step} ${n === step ? styles.stepActive : ''} ${n < step ? styles.stepDone : ''}`}>
                 <span className={styles.stepNumber}>{n < step ? <i className="bi bi-check" /> : n}</span>
-                {label}
+                <span className={styles.stepLabel}>{label}</span>
               </div>
             );
           })}
+        </div>
+        {/* Mobile-only: shows active step name below the bubble track */}
+        <div className={styles.stepperMobileLabel}>
+          Step {step} of {STEP_LABELS.length} &mdash; <strong>{STEP_LABELS[step - 1]}</strong>
         </div>
 
         {serverError && (
