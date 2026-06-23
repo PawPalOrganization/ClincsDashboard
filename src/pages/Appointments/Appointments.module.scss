@@ -262,9 +262,15 @@
   border-radius: 0.75rem;
   background: #fff;
   transition: border-color 0.15s;
+  flex-wrap: wrap;
 
   &:hover {
     border-color: rgba(13, 154, 255, 0.3);
+  }
+
+  @media (max-width: 520px) {
+    gap: 0.5rem 0.75rem;
+    padding: 0.875rem 1rem;
   }
 }
 
@@ -296,6 +302,13 @@
   span {
     font-size: 0.8rem;
     color: #6b7280;
+    display: block;
+    word-break: break-word;
+
+    @media (max-width: 520px) {
+      font-size: 0.75rem;
+      line-height: 1.5;
+    }
   }
 }
 
@@ -303,6 +316,12 @@
   display: flex;
   gap: 0.5rem;
   flex-shrink: 0;
+
+  // On small screens drop actions to their own row, indented past the order circle
+  @media (max-width: 520px) {
+    width: 100%;
+    padding-left: calc(36px + 0.75rem);
+  }
 }
 
 .queueActionBtn {
@@ -319,6 +338,12 @@
   &:hover {
     background: #f9fafb;
     border-color: #9ca3af;
+  }
+
+  @media (max-width: 520px) {
+    flex: 1;
+    text-align: center;
+    padding: 0.4rem 0.5rem;
   }
 
   &.finish {
