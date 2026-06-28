@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
 import Pusher from 'pusher-js';
-import type { ClinicNotification, ClinicStaff } from '../types/clinic.types';
+import type {
+  ClinicNotification,
+  ClinicStaff,
+  DataShareApprovedEvent,
+  DataShareDeniedEvent,
+} from '../types/clinic.types';
 
 const PUSHER_KEY     = import.meta.env.VITE_PUSHER_KEY     as string | undefined;
 const PUSHER_CLUSTER = import.meta.env.VITE_PUSHER_CLUSTER as string | undefined;
@@ -30,6 +35,8 @@ interface UseClinicPusherOptions {
   staff: ClinicStaff | null;
   branchId: string | null;
   onNotification: (n: ClinicNotification) => void;
+  onDataShareApproved?: (event: DataShareApprovedEvent) => void;
+  onDataShareDenied?: (event: DataShareDeniedEvent) => void;
 }
 
 export function useClinicPusher({
@@ -37,10 +44,18 @@ export function useClinicPusher({
   staff,
   branchId,
   onNotification,
+  onDataShareApproved,
+  onDataShareDenied,
 }: UseClinicPusherOptions) {
-  // Keep callback ref stable so the effect doesn't re-run when the parent re-renders
-  const callbackRef = useRef(onNotification);
-  callbackRef.current = onNotification;
+  // Keep callback refs stable so the effect doesn't re-run when parent re-renders
+  const notificationRef = useRef(onNotification);
+  notificationRef.current = onNotification;
+
+  const approvedRef = useRef(onDataShareApproved);
+  approvedRef.current = onDataShareApproved;
+
+  const deniedRef = useRef(onDataShareDenied);
+  deniedRef.current = onDataShareDenied;
 
   // Deduplicate events that arrive on multiple subscribed channels or on reconnect
   const seenIdsRef = useRef<Set<number | string>>(new Set());
@@ -49,7 +64,10 @@ export function useClinicPusher({
     if (!token || !PUSHER_KEY || !PUSHER_CLUSTER) return;
 
     const branchIds = getAccessibleBranchIds(staff, branchId);
-    if (branchIds.length === 0) return;
+    const staffId = staff?.id ? Number(staff.id) : null;
+
+    // Need at least one branch OR a staffId to bother connecting
+    if (branchIds.length === 0 && !staffId) return;
 
     const pusher = new Pusher(PUSHER_KEY, {
       cluster: PUSHER_CLUSTER,
@@ -59,18 +77,35 @@ export function useClinicPusher({
       },
     });
 
+    // ── Branch channels — notifications ──────────────────────────────────────
     for (const id of branchIds) {
       const channel = pusher.subscribe(`private-branch-${id}`);
 
       channel.bind('notification.created', (data: ClinicNotification) => {
         if (!data?.id || seenIdsRef.current.has(data.id)) return;
         seenIdsRef.current.add(data.id);
-        callbackRef.current(data);
+        notificationRef.current(data);
       });
 
-      // Log auth failures quietly — REST polling continues as fallback
       channel.bind('pusher:subscription_error', (err: unknown) => {
         console.warn(`[Pusher] auth failed for private-branch-${id}`, err);
+      });
+    }
+
+    // ── Staff channel — data-share consent events ─────────────────────────────
+    if (staffId) {
+      const staffChannel = pusher.subscribe(`private-staff-${staffId}`);
+
+      staffChannel.bind('data_share.approved', (data: DataShareApprovedEvent) => {
+        approvedRef.current?.(data);
+      });
+
+      staffChannel.bind('data_share.denied', (data: DataShareDeniedEvent) => {
+        deniedRef.current?.(data);
+      });
+
+      staffChannel.bind('pusher:subscription_error', (err: unknown) => {
+        console.warn(`[Pusher] auth failed for private-staff-${staffId}`, err);
       });
     }
 
@@ -82,8 +117,9 @@ export function useClinicPusher({
       for (const id of branchIds) {
         pusher.unsubscribe(`private-branch-${id}`);
       }
+      if (staffId) pusher.unsubscribe(`private-staff-${staffId}`);
       pusher.disconnect();
     };
-  // Re-connect when token or branch access changes (e.g. after login)
+  // Re-connect when token or branch/staff access changes (e.g. after login)
   }, [token, staff, branchId]);
 }

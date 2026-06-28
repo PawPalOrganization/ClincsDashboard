@@ -6,6 +6,7 @@ import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type { Appointment, AppointmentStatus } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
+import PetDetailModal from './PetDetailModal';
 import styles from './Appointments.module.scss';
 
 function formatDateTime(value?: string): string {
@@ -55,6 +56,7 @@ export default function AppointmentDetail() {
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [acting, setActing] = useState(false);
+  const [petModalOpen, setPetModalOpen] = useState(false);
 
   useEffect(() => {
     if (!id || !canView) { setLoading(false); return; }
@@ -113,6 +115,15 @@ export default function AppointmentDetail() {
 
   return (
     <div className={styles.page}>
+      {appointment?.petId && clinicId && (
+        <PetDetailModal
+          petId={Number(appointment.petId)}
+          clinicId={clinicId}
+          branchId={String(appointment.clinicBranchId)}
+          isOpen={petModalOpen}
+          onClose={() => setPetModalOpen(false)}
+        />
+      )}
       <div className={styles.pageHeader}>
         <div>
           {loading ? (
@@ -202,6 +213,17 @@ export default function AppointmentDetail() {
                 <label>Queue #</label>
                 <span>{appointment.visitorOrder ?? '—'}</span>
               </div>
+              {appointment.petId && clinicId && hasClinicPermission(authStaff, 'users.search') && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPetModalOpen(true)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-primary, #0d9aff)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 500, padding: 0, display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  >
+                    <i className="bi bi-heart-pulse" /> View Pet Profile
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Doctor */}

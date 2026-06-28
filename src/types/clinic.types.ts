@@ -360,8 +360,96 @@ export interface ClinicNotification {
   data?: ClinicNotificationData | null;
 }
 
-// ─── User search (for appointment booking) ───────────────────────────────────
+// ─── User search & data-share consent ────────────────────────────────────────
 
+export type ConsentStatus = 'none' | 'pending' | 'approved' | 'denied';
+
+export interface PetSummary {
+  id: number;
+  name: string;
+  imageUrl?: string;
+}
+
+// Discriminated union returned by GET /clinic/api/users/search?phone=&clinicId=
+export type UserSearchResponse =
+  | { found: false }
+  | { found: true; userId: number; consentStatus: 'none'; canRequestShare: true }
+  | { found: true; userId: number; consentStatus: 'pending'; canRequestShare: false }
+  | {
+      found: true;
+      userId: number;
+      consentStatus: 'approved';
+      firstName: string;
+      lastName: string;
+      phoneNumber: string;
+      pets: PetSummary[];
+    };
+
+// Pusher payload on private-staff-{staffId} → data_share.approved
+export interface DataShareApprovedEvent {
+  shareRequestId: number;
+  userId: number;
+  clinicId: number;
+  consentStatus: 'approved';
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  pets: PetSummary[];
+}
+
+// Pusher payload on private-staff-{staffId} → data_share.denied
+export interface DataShareDeniedEvent {
+  shareRequestId: number;
+  userId: number;
+  consentStatus: 'denied';
+}
+
+// ─── Pet portal (consent-gated) ───────────────────────────────────────────────
+
+export interface PetMedicine {
+  id: number;
+  petId: number;
+  name: string;
+  category: 'vaccine' | 'medicine' | 'other';
+  notes?: string;
+  dosageSchedule?: {
+    amount?: string;
+    unit?: string;
+    frequencyLabel?: string;
+    timesPerDay?: number;
+    instructions?: string;
+  };
+  batchNumber?: string;
+  lotNumber?: string;
+  recurrence?: unknown;
+  recurrenceEndDate?: string | null;
+  startDate?: string;
+  timezone?: string;
+  isActive?: boolean;
+  appointmentId?: number | null;
+  clinicId?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Full pet profile from GET /clinic/api/pets/:petId?clinicId=
+export interface PetProfile {
+  id: number;
+  name: string;
+  imageUrl?: string;
+  gender?: string;
+  size?: string;
+  weight?: string;
+  age?: string;
+  birthdate?: string;
+  notes?: string;
+  petType?: { id: number; name: string; imageUrl?: string };
+  breed?: { id: number; name: string };
+  owner?: { userId: number; firstName: string; lastName: string; phoneNumber: string };
+  medicines?: PetMedicine[];
+}
+
+// Kept for backward-compat — old search returned this shape; new endpoint returns UserSearchResponse
 export interface UserSearchResult {
   id: string | number;
   firstName: string;
