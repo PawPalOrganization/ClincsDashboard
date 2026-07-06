@@ -1,37 +1,44 @@
 import clinicApi from './clinicApi';
-import type { ApiResponse, UserSearchResponse } from '../../types/clinic.types';
+import type {
+  ApiResponse,
+  ShareRequestPayload,
+  UserLookupParams,
+  UserSearchResponse,
+} from '../../types/clinic.types';
 
 const clinicUserSearchService = {
-  // GET /clinic/api/users/search?phone={phone}&clinicId={clinicId}
+  // GET /clinic/api/users/single?clinicId=&(userHash|phoneNumber|userId)=
+  // Exactly one of userHash/phoneNumber/userId must be provided.
   // Returns a discriminated union based on whether the user exists and what consent state applies.
-  async searchByPhone(phone: string, clinicId: string | number): Promise<UserSearchResponse> {
-    const res = await clinicApi.get<ApiResponse<UserSearchResponse>>('/users/search', {
-      phone,
-      clinicId: String(clinicId),
+  // Also used to poll by userId while a share request is pending.
+  async lookup(params: UserLookupParams): Promise<UserSearchResponse> {
+    const identifiers = [params.userHash, params.phoneNumber, params.userId].filter(
+      (v) => v !== undefined && v !== null && v !== '',
+    );
+    if (identifiers.length !== 1) {
+      throw new Error('lookup() requires exactly one of userHash, phoneNumber, or userId.');
+    }
+
+    const res = await clinicApi.get<ApiResponse<UserSearchResponse>>('/users/single', {
+      clinicId: String(params.clinicId),
+      userHash: params.userHash,
+      phoneNumber: params.phoneNumber,
+      userId: params.userId !== undefined ? String(params.userId) : undefined,
     });
     return res.data;
   },
 
-  // POST /clinic/api/users/:userId/share-request  { clinicId }
+  // POST /clinic/api/users/share-request  { clinicId, userHash | phoneNumber }
   // Sends push + email to the pet owner requesting access.
   // Idempotent when already pending (no duplicate push); 409 if already approved.
-  async requestShare(
-    userId: string | number,
-    clinicId: string | number,
-  ): Promise<{ shareRequestId: number }> {
+  async requestShare(payload: ShareRequestPayload): Promise<{ shareRequestId: number }> {
     const res = await clinicApi.post<ApiResponse<{ shareRequestId: number }>>(
-      `/users/${userId}/share-request`,
-      { clinicId: Number(clinicId) },
-    );
-    return res.data;
-  },
-
-  // GET /clinic/api/users/:userId?clinicId={clinicId}
-  // Returns the approved profile + shared pets. Used as polling fallback while consent is pending.
-  async getProfile(userId: string | number, clinicId: string | number): Promise<UserSearchResponse> {
-    const res = await clinicApi.get<ApiResponse<UserSearchResponse>>(
-      `/users/${userId}`,
-      { clinicId: String(clinicId) },
+      '/users/share-request',
+      {
+        clinicId: Number(payload.clinicId),
+        userHash: payload.userHash,
+        phoneNumber: payload.phoneNumber,
+      },
     );
     return res.data;
   },

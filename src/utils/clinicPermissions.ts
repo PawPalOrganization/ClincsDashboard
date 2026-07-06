@@ -26,7 +26,8 @@ export type ClinicPermissionSlug =
   | 'appointments.update'
   | 'appointments.cancel'
   | 'users.search'
-  | 'users.share-request';
+  | 'users.share-request'
+  | 'users.read';
 
 const PRIVILEGED_ROLE_WORDS = ['owner'];
 

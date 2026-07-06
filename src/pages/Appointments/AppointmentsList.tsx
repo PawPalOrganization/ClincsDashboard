@@ -4,6 +4,7 @@ import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
+import { formatPatientDisplayName } from '../../utils/formatPatientDisplayName';
 import type {
   Appointment,
   AppointmentStatus,
@@ -123,13 +124,9 @@ export default function AppointmentsList() {
       width: '180px',
       render: (row) => (
         <div className={styles.doctorCell}>
-          <span>
-            {row.contactName
-              ?? (row.user ? `${row.user.firstName} ${row.user.lastName}` : null)
-              ?? (row.userId ? `User #${row.userId}` : '—')}
-          </span>
-          {(row.contactPhone ?? row.user?.phoneNumber) && (
-            <small>{row.contactPhone ?? row.user?.phoneNumber}</small>
+          <span>{formatPatientDisplayName(row.contactName, row.user, row.userId)}</span>
+          {(row.contactPhone || row.user?.phoneNumber) && (
+            <small>{row.contactPhone || row.user?.phoneNumber}</small>
           )}
         </div>
       ),

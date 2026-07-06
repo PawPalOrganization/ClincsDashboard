@@ -114,6 +114,12 @@ describe('hasClinicPermission', () => {
     expect(hasClinicPermission(staff, 'clinic-staff.read')).toBe(false);
   });
 
+  it('matches the users.read permission slug (patient directory)', () => {
+    const staff = makeStaffWithPermissions(['users.read']);
+    expect(hasClinicPermission(staff, 'users.read')).toBe(true);
+    expect(hasClinicPermission(staff, 'users.search')).toBe(false);
+  });
+
   it('handles all 22 permission slugs', () => {
     const ALL_SLUGS = [
       'clinics.read', 'clinics.create', 'clinics.update', 'clinics.delete', 'clinics.approve',

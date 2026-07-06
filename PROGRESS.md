@@ -4,7 +4,7 @@ Last updated: 2026-05-11
 
 ## Project Summary
 
-PawClinics is the clinic staff portal for Paw Buddy/PawPal.
+PawClinics is the clinic staff portal for Paw-Pal.
 
 Stack:
 - React 19 + TypeScript + Vite
@@ -27,7 +27,7 @@ Dev/prod backend:
 | Group | Base path | Used here? | Notes |
 |---|---:|---:|---|
 | Mobile API | `/api/*` | No | Mobile app only |
-| Admin Dashboard API | `/admin/api/*` | No | Used by `D:\Paw Buddy\pawProject` only |
+| Admin Dashboard API | `/admin/api/*` | No | Used by `D:\Pawpal\pawProject` only |
 | Clinic Dashboard API | `/clinic/api/*` | Yes | This app's API scope |
 | Public/Test/Dev | mixed | No | Not part of portal UI |
 
@@ -443,7 +443,7 @@ PATCH /clinic/api/clinic-staff/:staffId/status
 Admin dashboard repo:
 
 ```txt
-D:\Paw Buddy\pawProject
+D:\Pawpal\pawProject
 ```
 
 Findings:

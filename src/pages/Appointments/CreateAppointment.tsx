@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
+import { useClinicPusher } from '../../hooks/useClinicPusher';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import clinicCatalogService from '../../services/clinic/clinicCatalogService';
@@ -55,6 +56,32 @@ function fmt(time: string): string {
   return `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
+interface NormalizedBranchService {
+  clinicServiceId: number;
+  cost: number;
+  name?: string;
+}
+
+// The branch-detail GET returns `services` as full ClinicService-like objects
+// ({ id, name, cost, ... }) — `id` IS the clinic service id here, not `clinicServiceId`
+// (that field name only applies to the create/update payload shape). Same normalization
+// BranchForm.tsx already has to apply for the same reason.
+function normalizeBranchServices(rawServices?: ClinicBranch['services']): NormalizedBranchService[] {
+  if (!Array.isArray(rawServices) || rawServices.length === 0) return [];
+  return rawServices
+    .map((s: any): NormalizedBranchService | null => {
+      const id = s.clinicServiceId ?? s.serviceId ?? s.clinicService?.id ?? s.service?.id ?? s.id;
+      if (id == null || Number(id) <= 0) return null;
+      const name: string | undefined = s.name ?? s.clinicService?.name ?? s.service?.name ?? undefined;
+      return {
+        clinicServiceId: Number(id),
+        cost: s.cost != null ? Number(s.cost) : 0,
+        name,
+      };
+    })
+    .filter((row): row is NormalizedBranchService => row !== null);
+}
+
 const TODAY = new Date().toISOString().split('T')[0];
 
 type Step = 1 | 2 | 3 | 4;
@@ -63,7 +90,7 @@ const STEP_LABELS = ['Branch & Date', 'Doctor & Time', 'Patient', 'Services'];
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CreateAppointment() {
-  const { clinicId, staff: authStaff } = useClinicAuth();
+  const { clinicId, staff: authStaff, token, branchId: authBranchId } = useClinicAuth();
   const navigate = useNavigate();
   const canCreate = hasClinicPermission(authStaff, 'appointments.create');
 
@@ -84,21 +111,32 @@ export default function CreateAppointment() {
   const [selectedSlot, setSelectedSlot] = useState('');
   const [manualTimes, setManualTimes] = useState<Record<string, string>>({});
 
-  // Step 3 — consent-aware patient search
+  // Step 3 — consent-aware patient lookup
   type ConsentPhase = 'idle' | 'searching' | 'not_found' | 'none' | 'pending' | 'approved';
+  type LookupMethod = 'code' | 'phone';
   const [isWalkIn, setIsWalkIn] = useState(false);
-  const [phoneInput, setPhoneInput] = useState('');
+  const [lookupMethod, setLookupMethod] = useState<LookupMethod>('code');
+  const [lookupValue, setLookupValue] = useState('');
+  const [lookupFormatError, setLookupFormatError] = useState('');
   const [consentPhase, setConsentPhase] = useState<ConsentPhase>('idle');
   const [pendingUserId, setPendingUserId] = useState<number | null>(null);
+  // The identifier that successfully found the user — share-request needs this, not userId.
+  const [foundIdentifier, setFoundIdentifier] = useState<
+    { type: 'userHash' | 'phoneNumber'; value: string } | null
+  >(null);
   const [approvedUser, setApprovedUser] = useState<{
     userId: number; firstName: string; lastName: string; phoneNumber: string; pets: PetSummary[];
   } | null>(null);
   const [selectedPetId, setSelectedPetId] = useState<number | null>(null);
   const [shareRequestError, setShareRequestError] = useState('');
   const [shareRequestLoading, setShareRequestLoading] = useState(false);
+  const [additionalPetShareLoading, setAdditionalPetShareLoading] = useState(false);
+  const [additionalPetShareMessage, setAdditionalPetShareMessage] = useState('');
   const [walkInName, setWalkInName] = useState('');
   const [walkInPhone, setWalkInPhone] = useState('');
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const USER_HASH_RE = /^[a-z]+-[a-z]+-[a-z0-9]{4}$/;
 
   // Step 4
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<number>>(new Set());
@@ -108,12 +146,10 @@ export default function CreateAppointment() {
   // Lookup map: clinicServiceId → name from catalog
   const catalogMap = new Map(catalog.map((s) => [Number(s.id), s.name]));
 
-  // Services to show in step 4: branch services first, fallback to catalog
-  const branchServices = (selectedBranchDetail?.services ?? [])
-    .filter((s) => s.clinicServiceId != null && Number(s.clinicServiceId) > 0);
-  const validServices = branchServices.length > 0
-    ? branchServices
-    : catalog.map((s) => ({ clinicServiceId: Number(s.id), cost: 0 }));
+  // Services to show in step 4 — must be services actually assigned to this branch
+  // (Branch settings → Services). The backend rejects clinicServiceIds not configured
+  // for the branch, so we must NOT fall back to the full platform catalog here.
+  const validServices = normalizeBranchServices(selectedBranchDetail?.services);
 
   const doctorObj = doctors.find((d) => String(d.id) === selectedDoctor);
   const finalTime = selectedSlot || manualTimes[selectedDoctor] || '';
@@ -150,12 +186,14 @@ export default function CreateAppointment() {
     setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
   }, [selectedDate]);
 
-  // Poll every 3 s while waiting for owner to approve a data-share request
+  // Poll every 3 s while waiting for owner to approve a data-share request.
+  // Fallback for staff without a live Pusher connection — see useClinicPusher subscription below,
+  // which resolves this instantly when it's available.
   useEffect(() => {
     if (consentPhase !== 'pending' || !pendingUserId || !clinicId) return;
     pollingRef.current = setInterval(async () => {
       try {
-        const res = await clinicUserSearchService.searchByPhone(phoneInput, clinicId);
+        const res = await clinicUserSearchService.lookup({ clinicId, userId: pendingUserId });
         if (res.found && res.consentStatus === 'approved') {
           clearInterval(pollingRef.current!);
           pollingRef.current = null;
@@ -170,7 +208,28 @@ export default function CreateAppointment() {
     return () => {
       if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
     };
-  }, [consentPhase, pendingUserId, clinicId, phoneInput]);
+  }, [consentPhase, pendingUserId, clinicId]);
+
+  // Live update — short-circuits the 3s poll the instant the owner approves/denies via Pusher.
+  useClinicPusher({
+    token,
+    staff: authStaff,
+    branchId: authBranchId,
+    onNotification: () => {},
+    onDataShareApproved: (event) => {
+      if (event.userId !== pendingUserId) return;
+      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+      setConsentPhase('approved');
+      setApprovedUser(event);
+      setSelectedPetId(null);
+    },
+    onDataShareDenied: (event) => {
+      if (event.userId !== pendingUserId) return;
+      if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+      setConsentPhase('none');
+      setShareRequestError('The owner declined the sharing request. You can send another request.');
+    },
+  });
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
@@ -186,55 +245,75 @@ export default function CreateAppointment() {
     setManualTimes((p) => ({ ...p, [doctorId]: time }));
   }
 
-  async function handlePhoneSearch() {
-    if (!clinicId || !phoneInput.trim()) return;
+  async function handleLookup() {
+    if (!clinicId || !lookupValue.trim()) return;
+    const value = lookupMethod === 'code' ? lookupValue.trim().toLowerCase() : lookupValue.trim();
+
+    if (lookupMethod === 'code' && !USER_HASH_RE.test(value)) {
+      setLookupFormatError('Invalid code format. Expected something like "firstname-lastname-1234".');
+      return;
+    }
+    setLookupFormatError('');
     setConsentPhase('searching');
     setShareRequestError('');
     setApprovedUser(null);
     setSelectedPetId(null);
     setPendingUserId(null);
+    setFoundIdentifier(null);
     try {
-      const res = await clinicUserSearchService.searchByPhone(phoneInput.trim(), clinicId);
+      const res = await clinicUserSearchService.lookup({
+        clinicId,
+        userHash: lookupMethod === 'code' ? value : undefined,
+        phoneNumber: lookupMethod === 'phone' ? value : undefined,
+      });
       if (!res.found) {
         setConsentPhase('not_found');
         setIsWalkIn(true);
-        setWalkInPhone(phoneInput.trim());
-      } else if (res.consentStatus === 'approved') {
-        setConsentPhase('approved');
-        setApprovedUser(res);
-      } else if (res.consentStatus === 'pending') {
-        setConsentPhase('pending');
-        setPendingUserId(res.userId);
+        if (lookupMethod === 'phone') setWalkInPhone(value);
       } else {
-        setConsentPhase('none');
         setPendingUserId(res.userId);
+        setFoundIdentifier({ type: lookupMethod === 'code' ? 'userHash' : 'phoneNumber', value });
+        if (res.consentStatus === 'approved') {
+          setConsentPhase('approved');
+          setApprovedUser(res);
+        } else if (res.consentStatus === 'pending') {
+          setConsentPhase('pending');
+        } else {
+          setConsentPhase('none');
+        }
       }
     } catch (err) {
       setConsentPhase('idle');
       const status = (err as { status?: number }).status;
-      if (status === 403) {
+      if (status === 400) {
+        setShareRequestError('Invalid lookup format. Double-check the code or phone number.');
+      } else if (status === 403) {
         setShareRequestError('Your role does not have permission to search patients. Contact your clinic administrator.');
       } else if (status === 500) {
         setShareRequestError('Server error (500) — the backend may need a database migration. Contact your backend team.');
       } else {
-        setShareRequestError('Search failed. Please try again.');
+        setShareRequestError('Lookup failed. Please try again.');
       }
     }
   }
 
   async function handleRequestShare() {
-    if (!clinicId || !pendingUserId) return;
+    if (!clinicId || !foundIdentifier) return;
     setShareRequestLoading(true);
     setShareRequestError('');
     try {
-      await clinicUserSearchService.requestShare(pendingUserId, clinicId);
+      await clinicUserSearchService.requestShare({
+        clinicId,
+        userHash: foundIdentifier.type === 'userHash' ? foundIdentifier.value : undefined,
+        phoneNumber: foundIdentifier.type === 'phoneNumber' ? foundIdentifier.value : undefined,
+      });
       setConsentPhase('pending');
     } catch (err) {
-      // 409 = already approved — re-fetch profile
+      // 409 = already approved — re-fetch by userId (works regardless of which identifier found them)
       const status = (err as { status?: number }).status;
-      if (status === 409) {
+      if (status === 409 && pendingUserId) {
         try {
-          const profile = await clinicUserSearchService.searchByPhone(phoneInput.trim(), clinicId);
+          const profile = await clinicUserSearchService.lookup({ clinicId, userId: pendingUserId });
           if (profile.found && profile.consentStatus === 'approved') {
             setConsentPhase('approved');
             setApprovedUser(profile);
@@ -251,13 +330,48 @@ export default function CreateAppointment() {
     }
   }
 
+  // Asks the owner to expand an already-approved share to cover a pet not currently
+  // in `approvedUser.pets`. Note: today's backend contract 409s "already approved" for
+  // any repeat call to /users/share-request once consent is approved — there is no
+  // documented endpoint yet for adding a pet to an existing share, so this always
+  // surfaces the explanatory message below rather than a real pending state. Needs
+  // backend support (either letting share-request succeed again, or a dedicated
+  // "add pet to share" endpoint) to become a functional flow.
+  async function handleRequestAdditionalPetShare() {
+    if (!clinicId || !foundIdentifier) return;
+    setAdditionalPetShareLoading(true);
+    setAdditionalPetShareMessage('');
+    try {
+      await clinicUserSearchService.requestShare({
+        clinicId,
+        userHash: foundIdentifier.type === 'userHash' ? foundIdentifier.value : undefined,
+        phoneNumber: foundIdentifier.type === 'phoneNumber' ? foundIdentifier.value : undefined,
+      });
+      setAdditionalPetShareMessage('Request sent — ask the owner to check their Paw-Pal app.');
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status === 409) {
+        setAdditionalPetShareMessage(
+          'This owner already has an active data-sharing approval on file. To share an additional pet, ask them to update sharing from their Paw-Pal app.',
+        );
+      } else {
+        setAdditionalPetShareMessage(err instanceof Error ? err.message : 'Failed to send request.');
+      }
+    } finally {
+      setAdditionalPetShareLoading(false);
+    }
+  }
+
   function resetConsentState() {
     setConsentPhase('idle');
-    setPhoneInput('');
+    setLookupValue('');
+    setLookupFormatError('');
     setPendingUserId(null);
+    setFoundIdentifier(null);
     setApprovedUser(null);
     setSelectedPetId(null);
     setShareRequestError('');
+    setAdditionalPetShareMessage('');
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
   }
 
@@ -269,14 +383,19 @@ export default function CreateAppointment() {
     });
   }
 
+  // Patient/pet requirement from step 3 — re-checked at step 4 too, since consent can
+  // flip (and selectedPetId reset to null) via Pusher/poll while the staff member has
+  // already moved on to the services step.
+  function isPatientStepValid(): boolean {
+    if (isWalkIn) return !!walkInName.trim();
+    return consentPhase === 'approved' && !!approvedUser && selectedPetId !== null;
+  }
+
   function canAdvance(): boolean {
     if (step === 1) return !!selectedBranch && !!selectedDate;
     if (step === 2) return !!selectedDoctor && !!finalTime;
-    if (step === 3) {
-      if (isWalkIn) return !!walkInName.trim();
-      return consentPhase === 'approved' && selectedPetId !== null;
-    }
-    if (step === 4) return validServices.length > 0 && selectedServiceIds.size > 0;
+    if (step === 3) return isPatientStepValid();
+    if (step === 4) return isPatientStepValid() && validServices.length > 0 && selectedServiceIds.size > 0;
     return false;
   }
 
@@ -284,6 +403,14 @@ export default function CreateAppointment() {
     if (!finalTime) return;
     const serviceIds = Array.from(selectedServiceIds).filter((id) => id > 0);
     if (!serviceIds.length) { setServerError('Select at least one service.'); return; }
+    if (!isPatientStepValid()) {
+      setServerError(
+        isWalkIn
+          ? 'Enter the walk-in patient name.'
+          : 'Select a pet for this patient before booking — consent status may have changed, go back to the Patient step.',
+      );
+      return;
+    }
     setSaving(true);
     setServerError('');
     try {
@@ -504,33 +631,56 @@ export default function CreateAppointment() {
           <div className={styles.stepCard}>
             <p className={styles.stepCardTitle}>Who is this appointment for?</p>
 
-            {/* ── Registered user — consent-aware phone search ── */}
+            {/* ── Registered user — consent-aware lookup by code or phone ── */}
             {!isWalkIn && (
               <div style={{ display: 'grid', gap: '0.875rem' }}>
 
-                {/* Phone input + Search button */}
+                {/* Lookup method toggle + input + Search button */}
                 {(consentPhase === 'idle' || consentPhase === 'not_found') && (
                   <div>
-                    <label className={styles.fieldLabel}>Patient Phone Number</label>
+                    <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className={`${styles.slotBtn} ${lookupMethod === 'code' ? styles.slotBtnSelected : ''}`}
+                        onClick={() => { setLookupMethod('code'); setLookupValue(''); setLookupFormatError(''); }}
+                      >
+                        Lookup by Code
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.slotBtn} ${lookupMethod === 'phone' ? styles.slotBtnSelected : ''}`}
+                        onClick={() => { setLookupMethod('phone'); setLookupValue(''); setLookupFormatError(''); }}
+                      >
+                        Lookup by Phone
+                      </button>
+                    </div>
+                    <label className={styles.fieldLabel}>
+                      {lookupMethod === 'code' ? 'Patient Lookup Code' : 'Patient Phone Number'}
+                    </label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <input
-                        type="tel"
+                        type={lookupMethod === 'code' ? 'text' : 'tel'}
                         className={styles.textInput}
-                        placeholder="+201234567890"
-                        value={phoneInput}
-                        onChange={(e) => setPhoneInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && !!phoneInput.trim() && handlePhoneSearch()}
+                        placeholder={lookupMethod === 'code' ? 'firstname-lastname-1234' : '+201234567890'}
+                        value={lookupValue}
+                        onChange={(e) => setLookupValue(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && !!lookupValue.trim() && handleLookup()}
                         style={{ flex: 1 }}
                       />
                       <Button
                         variant="outline"
                         icon="bi-search"
-                        onClick={handlePhoneSearch}
-                        disabled={!phoneInput.trim()}
+                        onClick={handleLookup}
+                        disabled={!lookupValue.trim()}
                       >
-                        Search
+                        Request Access
                       </Button>
                     </div>
+                    {lookupFormatError && (
+                      <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#e74c3c' }}>
+                        <i className="bi bi-exclamation-circle" /> {lookupFormatError}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -540,20 +690,20 @@ export default function CreateAppointment() {
                   </div>
                 )}
 
-                {/* Searching spinner */}
+                {/* Looking up patient */}
                 {consentPhase === 'searching' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6b7280', fontSize: '0.875rem' }}>
-                    <div className="spinner-border spinner-border-sm text-primary" role="status" />
-                    Searching…
+                    <PawLoader size="small" />
+                    Looking up patient…
                   </div>
                 )}
 
                 {/* No account found */}
                 {consentPhase === 'not_found' && (
                   <div className={`alert alert-info py-2 ${styles.feedbackAlert}`} style={{ marginBottom: 0 }}>
-                    <i className="bi bi-info-circle" /> No account found for this number. Use walk-in below, or{' '}
+                    <i className="bi bi-info-circle" /> No account found for this {lookupMethod === 'code' ? 'code' : 'number'}. Use walk-in below, or{' '}
                     <button type="button" style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0 }} onClick={resetConsentState}>
-                      try another number
+                      try again
                     </button>.
                   </div>
                 )}
@@ -568,7 +718,7 @@ export default function CreateAppointment() {
                           Account found — consent required
                         </p>
                         <p style={{ margin: '0 0 0.875rem', fontSize: '0.8rem', color: '#6b7280' }}>
-                          This patient has a PawBuddy account. Request their permission before viewing their information or booking on their behalf.
+                          This patient has a Paw-Pal account. Request their permission before viewing their information or booking on their behalf.
                         </p>
                         {hasClinicPermission(authStaff, 'users.share-request') ? (
                           <Button
@@ -598,7 +748,7 @@ export default function CreateAppointment() {
                 {consentPhase === 'pending' && (
                   <div style={{ border: '1px dashed #93c5fd', borderRadius: '0.75rem', padding: '1rem', background: '#eff6ff' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div className="spinner-border spinner-border-sm text-primary" role="status" />
+                      <PawLoader size="small" />
                       <div style={{ flex: 1 }}>
                         <p style={{ margin: '0 0 0.2rem', fontWeight: 600, fontSize: '0.875rem', color: '#1e40af' }}>
                           Waiting for owner approval
@@ -674,6 +824,25 @@ export default function CreateAppointment() {
                         </div>
                       )}
                     </div>
+
+                    {/* Owner may have pets not yet shared with this clinic */}
+                    {hasClinicPermission(authStaff, 'users.share-request') && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={handleRequestAdditionalPetShare}
+                          disabled={additionalPetShareLoading}
+                          style={{ background: 'none', border: 'none', color: 'var(--color-primary, #0d9aff)', textDecoration: 'underline', cursor: additionalPetShareLoading ? 'default' : 'pointer', fontSize: '0.8rem', padding: 0 }}
+                        >
+                          {additionalPetShareLoading ? 'Sending…' : "Don't see the pet you need? Request sharing for another pet"}
+                        </button>
+                        {additionalPetShareMessage && (
+                          <p style={{ fontSize: '0.78rem', color: '#6b7280', margin: '0.35rem 0 0' }}>
+                            <i className="bi bi-info-circle" /> {additionalPetShareMessage}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -714,6 +883,20 @@ export default function CreateAppointment() {
           <div className={styles.stepCard}>
             <p className={styles.stepCardTitle}>Services & confirm</p>
 
+            {!isPatientStepValid() && (
+              <div className={`alert alert-warning py-2 ${styles.feedbackAlert}`} role="alert">
+                <i className="bi bi-exclamation-triangle-fill" /> Patient selection is no longer valid
+                (consent status may have changed).{' '}
+                <button
+                  type="button"
+                  style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  onClick={() => setStep(3)}
+                >
+                  Go back to Patient step
+                </button>.
+              </div>
+            )}
+
             {/* Summary */}
             <div className={styles.bookingSummary}>
               <div className={styles.summaryRow}>
@@ -750,13 +933,14 @@ export default function CreateAppointment() {
             {/* Services */}
             {validServices.length === 0 && (
               <div className="alert alert-info py-2" style={{ fontSize: '0.875rem', marginTop: '1.25rem' }}>
-                <i className="bi bi-info-circle" /> No services available for this branch yet.
+                <i className="bi bi-info-circle" /> This branch has no services configured yet.
+                Add services under Branches → {branches.find((b) => String(b.id) === selectedBranch)?.title ?? 'this branch'} → Edit before booking.
               </div>
             )}
             <div className={styles.serviceCheckList} style={{ marginTop: '1.25rem' }}>
               {validServices.map((s) => {
                 const checked = selectedServiceIds.has(s.clinicServiceId);
-                const name = catalogMap.get(s.clinicServiceId) ?? `Service #${s.clinicServiceId}`;
+                const name = s.name ?? catalogMap.get(s.clinicServiceId) ?? `Service #${s.clinicServiceId}`;
                 return (
                   <label key={s.clinicServiceId} className={`${styles.serviceCheckItem} ${checked ? styles.checked : ''}`}>
                     <input type="checkbox" checked={checked} onChange={() => toggleService(s.clinicServiceId)} />

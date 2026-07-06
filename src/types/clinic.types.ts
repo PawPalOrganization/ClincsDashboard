@@ -370,7 +370,7 @@ export interface PetSummary {
   imageUrl?: string;
 }
 
-// Discriminated union returned by GET /clinic/api/users/search?phone=&clinicId=
+// Discriminated union returned by GET /clinic/api/users/single?clinicId=&(userHash|phoneNumber|userId)=
 export type UserSearchResponse =
   | { found: false }
   | { found: true; userId: number; consentStatus: 'none'; canRequestShare: true }
@@ -378,12 +378,28 @@ export type UserSearchResponse =
   | {
       found: true;
       userId: number;
+      userHash: string;
       consentStatus: 'approved';
       firstName: string;
       lastName: string;
       phoneNumber: string;
       pets: PetSummary[];
     };
+
+// Exactly one of userHash/phoneNumber/userId must be set — GET /clinic/api/users/single
+export interface UserLookupParams {
+  clinicId: string | number;
+  userHash?: string;
+  phoneNumber?: string;
+  userId?: string | number;
+}
+
+// Exactly one of userHash/phoneNumber must be set — POST /clinic/api/users/share-request
+export interface ShareRequestPayload {
+  clinicId: string | number;
+  userHash?: string;
+  phoneNumber?: string;
+}
 
 // Pusher payload on private-staff-{staffId} → data_share.approved
 export interface DataShareApprovedEvent {
@@ -455,4 +471,86 @@ export interface UserSearchResult {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
+}
+
+// ─── Patient Directory (approved-consent patients only) ──────────────────────
+
+export interface PatientDirectoryStats {
+  totalAppointments: number;
+  finishedAppointments: number;
+  cancelledAppointments: number;
+  upcomingAppointments: number;
+  lastVisitDate?: string;
+}
+
+// GET /clinic/api/users/directory?clinicId=&page=&limit=&search=&sort=&branchId=
+//   &minAppointments=&lastVisitFrom=&lastVisitTo=&hasUpcoming=&sharedPetId=
+export interface PatientDirectoryItem {
+  userId: number;
+  userHash: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  consentStatus: 'approved';
+  consentApprovedAt: string;
+  sharedPetsCount: number;
+  sharedPetsPreview: PetSummary[]; // first 3 only — full list on the profile
+  stats: PatientDirectoryStats;
+}
+
+export interface PatientDirectoryListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sort?: 'lastVisit' | 'name' | 'totalAppointments' | 'consentApprovedAt';
+  branchId?: string | number;
+  minAppointments?: number;
+  lastVisitFrom?: string;
+  lastVisitTo?: string;
+  hasUpcoming?: boolean;
+  sharedPetId?: string | number;
+}
+
+export interface PatientAppointmentStats {
+  total: number;
+  finished: number;
+  cancelled: number;
+  upcoming: number;
+  rescheduled: number;
+}
+
+export interface PatientVisitStats {
+  firstVisitDate?: string;
+  lastVisitDate?: string;
+  lastVisitBranch?: { id: string | number; title: string };
+  daysSinceLastVisit?: number;
+  averageDaysBetweenVisits?: number;
+}
+
+// GET /clinic/api/users/:userId/clinic-profile?clinicId=  — 404 if no approved share
+export interface PatientClinicProfile {
+  userId: number;
+  userHash: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  consentStatus: 'approved';
+  consentApprovedAt: string;
+  pets: PetSummary[];
+  stats: {
+    appointments: PatientAppointmentStats;
+    visits: PatientVisitStats;
+    pets: { sharedCount: number; distinctPetsVisited: number };
+    spend: { totalFinishedSpend: number };
+    bookingSource: { ownerBooked: number; clinicBooked: number };
+  };
+  recentAppointments: Appointment[]; // last 5
+}
+
+// GET /clinic/api/users/:userId/appointments?clinicId=&page=&limit=&status=&branchId=
+export interface PatientAppointmentListParams {
+  page?: number;
+  limit?: number;
+  status?: AppointmentStatus;
+  branchId?: string | number;
 }

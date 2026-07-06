@@ -26,6 +26,8 @@ const TodayQueue         = lazy(() => import('./pages/Appointments/TodayQueue'))
 const CreateAppointment  = lazy(() => import('./pages/Appointments/CreateAppointment'));
 const AppointmentDetail  = lazy(() => import('./pages/Appointments/AppointmentDetail'));
 const ServicesList       = lazy(() => import('./pages/Services/ServicesList'));
+const PatientsList       = lazy(() => import('./pages/Patients/PatientsList'));
+const PatientProfile     = lazy(() => import('./pages/Patients/PatientProfile'));
 
 // ─── Root redirect ─────────────────────────────────────────────────────────
 // Reads auth state and sends the user to the right place.
@@ -116,6 +118,8 @@ export default function App() {
                 <Route path="/appointments/create" element={<CreateAppointment />} />
                 <Route path="/appointments/:id"    element={<AppointmentDetail />} />
                 <Route path="/services"            element={<ServicesList />} />
+                <Route path="/patients"            element={<PatientsList />} />
+                <Route path="/patients/:userId"    element={<PatientProfile />} />
                 <Route path="/settings"            element={<ClinicSettings />} />
               </Route>
             </Route>

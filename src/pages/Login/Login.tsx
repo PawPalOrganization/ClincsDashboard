@@ -5,7 +5,7 @@ import { useClinicAuth } from '../../context/ClinicAuthContext';
 import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
 import PawLoader from '../../components/common/PawLoader/PawLoader';
-import logoPawBuddy from '../../assets/images/LogoPawBuddy.png';
+import logoPawPal from '../../assets/images/LogoPawPal.png';
 import styles from './Login.module.scss';
 
 interface FormData {
@@ -132,7 +132,7 @@ export default function Login() {
 
           {/* company logo */}
           <div className={styles.heroLogo}>
-            <img src={logoPawBuddy} alt="Paw Buddy" className={styles.heroLogoImg} />
+            <img src={logoPawPal} alt="Paw-Pal" className={styles.heroLogoImg} />
           </div>
 
           {/* center visual */}

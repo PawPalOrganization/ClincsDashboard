@@ -25,12 +25,13 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { path: '/dashboard',    icon: 'bi-grid',            label: 'Dashboard'    },
-  { path: '/branches',     icon: 'bi-building',        label: 'Branches',     permission: 'clinic-branches.read'  },
-  { path: '/appointments', icon: 'bi-calendar-check',  label: 'Appointments', permission: 'appointments.read'     },
-  { path: '/services',     icon: 'bi-scissors',        label: 'Services',     permission: 'clinic-services.read'  },
-  { path: '/staff',        icon: 'bi-people',          label: 'Staff',        permission: 'clinic-staff.read'     },
-  { path: '/settings',     icon: 'bi-gear',            label: 'Settings',     permission: 'clinics.read'          },
+  { path: '/dashboard',    icon: 'bi-grid',              label: 'Dashboard'    },
+  { path: '/branches',     icon: 'bi-building',          label: 'Branches',     permission: 'clinic-branches.read'  },
+  { path: '/appointments', icon: 'bi-calendar-check',    label: 'Appointments', permission: 'appointments.read'     },
+  { path: '/patients',     icon: 'bi-person-lines-fill', label: 'Patients',     permission: 'users.read'            },
+  { path: '/services',     icon: 'bi-scissors',          label: 'Services',     permission: 'clinic-services.read'  },
+  { path: '/staff',        icon: 'bi-people',            label: 'Staff',        permission: 'clinic-staff.read'     },
+  { path: '/settings',     icon: 'bi-gear',              label: 'Settings',     permission: 'clinics.read'          },
 ];
 
 export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {

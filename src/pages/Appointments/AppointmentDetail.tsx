@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
+import { formatPatientDisplayName } from '../../utils/formatPatientDisplayName';
 import type { Appointment, AppointmentStatus } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
@@ -186,9 +187,7 @@ export default function AppointmentDetail() {
               <div className={styles.detailRow}>
                 <label>Name</label>
                 <span>
-                  {appointment.contactName
-                    ?? (appointment.user ? `${appointment.user.firstName} ${appointment.user.lastName}` : null)
-                    ?? (appointment.userId ? `User #${appointment.userId}` : '—')}
+                  {formatPatientDisplayName(appointment.contactName, appointment.user, appointment.userId)}
                 </span>
               </div>
               {appointment.user?.phoneNumber && (
