@@ -26,10 +26,7 @@ export default function EditBranch() {
   const [serverError, setServerError] = useState('');
 
   useEffect(() => {
-    if (!clinicId || !branchId) {
-      setLoading(false);
-      return;
-    }
+    if (!clinicId || !branchId) return;
 
     async function fetchBranch() {
       try {
@@ -58,6 +55,30 @@ export default function EditBranch() {
     }
   }
 
+  // useMemo ensures defaultValues only changes when `branch` changes, not on every render
+  // (saving/serverError re-renders must not reset form state the user is editing).
+  // Must run before any early return below — clinicId/branchId become available
+  // asynchronously as auth hydrates, so a hook after a conditional return here would
+  // change the number of hooks called between renders (React hook-order violation).
+  const defaultValues = useMemo<BranchFormInitialValues | undefined>(
+    () => branch
+      ? {
+          title:        branch.title,
+          description:  branch.description,
+          logoUrl:      branch.logoUrl,
+          isMainBranch: branch.isMainBranch,
+          phoneNumber:  branch.phoneNumber,
+          lat:          branch.lat,
+          lng:          branch.lng,
+          address:      branch.address,
+          services:     branch.services,
+          tags:         branch.tags,
+          workingHours: branch.workingHours,
+        }
+      : undefined,
+    [branch],
+  );
+
   if (!clinicId || !branchId) {
     return (
       <div className={styles.noClinic}>
@@ -79,27 +100,6 @@ export default function EditBranch() {
       </div>
     );
   }
-
-  // useMemo ensures defaultValues only changes when `branch` changes, not on every render
-  // (saving/serverError re-renders must not reset form state the user is editing)
-  const defaultValues = useMemo<BranchFormInitialValues | undefined>(
-    () => branch
-      ? {
-          title:        branch.title,
-          description:  branch.description,
-          logoUrl:      branch.logoUrl,
-          isMainBranch: branch.isMainBranch,
-          phoneNumber:  branch.phoneNumber,
-          lat:          branch.lat,
-          lng:          branch.lng,
-          address:      branch.address,
-          services:     branch.services,
-          tags:         branch.tags,
-          workingHours: branch.workingHours,
-        }
-      : undefined,
-    [branch],
-  );
 
   return (
     <>

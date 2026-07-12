@@ -30,10 +30,7 @@ export default function CreateDoctor() {
   const [serverError, setServerError] = useState('');
 
   useEffect(() => {
-    if (!clinicId || !canCreateStaff) {
-      setLoading(false);
-      return;
-    }
+    if (!clinicId || !canCreateStaff) return;
 
     async function loadOptions() {
       setLoading(true);

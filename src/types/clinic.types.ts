@@ -213,7 +213,7 @@ export interface CreateClinicStaffPayload {
   lastName: string;
   email: string;
   password: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   bio?: string;
   gender?: 'male' | 'female' | 'other';
   yearsOfExperience?: number;
@@ -229,7 +229,7 @@ export interface CreateClinicStaffPayload {
 export interface UpdateClinicStaffPayload {
   firstName?: string;
   lastName?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   bio?: string;
   email?: string;
   password?: string;

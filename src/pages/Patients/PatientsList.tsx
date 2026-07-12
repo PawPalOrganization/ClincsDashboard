@@ -50,10 +50,17 @@ export default function PatientsList() {
   const [loadingBranches, setLoadingBranches] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => { setPage(1); }, [selectedBranchId, sort, hasUpcoming, debouncedSearch]);
+  // Reset to page 1 whenever the (deferred) search text actually changes — the other
+  // filters already reset page directly in their onChange handlers below. Adjusting
+  // state during render (rather than a dedicated effect) avoids an extra render pass.
+  const [prevDebouncedSearch, setPrevDebouncedSearch] = useState(debouncedSearch);
+  if (debouncedSearch !== prevDebouncedSearch) {
+    setPrevDebouncedSearch(debouncedSearch);
+    setPage(1);
+  }
 
   useEffect(() => {
-    if (!clinicId) { setLoadingBranches(false); return; }
+    if (!clinicId) return;
     clinicBranchesService.list(clinicId, 1, 100)
       .then((res) => setBranches(res.items))
       .catch(() => {})
@@ -86,7 +93,8 @@ export default function PatientsList() {
   }, [clinicId, page, debouncedSearch, sort, selectedBranchId, hasUpcoming]);
 
   useEffect(() => {
-    if (!clinicId || !canView) { setLoading(false); return; }
+    if (!clinicId || !canView) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: fetchPatients flags loading, then fetches
     fetchPatients();
   }, [canView, clinicId, fetchPatients]);
 
@@ -227,7 +235,7 @@ export default function PatientsList() {
           <select
             className={styles.filterSelect}
             value={selectedBranchId}
-            onChange={(e) => setSelectedBranchId(e.target.value)}
+            onChange={(e) => { setSelectedBranchId(e.target.value); setPage(1); }}
             disabled={loadingBranches}
           >
             <option value="">All branches</option>
@@ -239,7 +247,7 @@ export default function PatientsList() {
           <select
             className={styles.filterSelect}
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortOption)}
+            onChange={(e) => { setSort(e.target.value as SortOption); setPage(1); }}
           >
             <option value="lastVisit">Sort: Last visit</option>
             <option value="name">Sort: Name</option>
@@ -251,7 +259,7 @@ export default function PatientsList() {
             <input
               type="checkbox"
               checked={hasUpcoming}
-              onChange={(e) => setHasUpcoming(e.target.checked)}
+              onChange={(e) => { setHasUpcoming(e.target.checked); setPage(1); }}
             />
             Has upcoming
           </label>

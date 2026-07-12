@@ -10,7 +10,7 @@ export interface DataRow {
 
 export interface Column<T extends DataRow> {
   key: string;
-  label: string;
+  label: ReactNode;
   width?: string;
   render?: (row: T) => ReactNode;
 }
@@ -43,9 +43,11 @@ function DataTableInner<T extends DataRow>({
   function renderPagination(): ReactNode {
     if (totalPages <= 1) return null;
 
-    const maxVisiblePages = 5;
+    const maxVisiblePages = 4;
+    const jumpSize = 10;
+
     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
     if (endPage - startPage < maxVisiblePages - 1) {
       startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
@@ -59,6 +61,7 @@ function DataTableInner<T extends DataRow>({
           className={styles.pageButton}
           onClick={() => onPageChange(currentPage - 1)}
           disabled={loading || currentPage === 1}
+          title="Previous page"
         >
           <i className="bi bi-chevron-left" />
         </button>
@@ -68,7 +71,16 @@ function DataTableInner<T extends DataRow>({
             <button className={styles.pageButton} onClick={() => onPageChange(1)} disabled={loading}>
               1
             </button>
-            {startPage > 2 && <span className={styles.ellipsis}>...</span>}
+            {startPage > 2 && (
+              <button
+                className={styles.jumpButton}
+                onClick={() => onPageChange(Math.max(1, startPage - jumpSize))}
+                disabled={loading}
+                title={`Back ${jumpSize} pages`}
+              >
+                <i className="bi bi-chevron-double-left" />
+              </button>
+            )}
           </>
         )}
 
@@ -90,7 +102,16 @@ function DataTableInner<T extends DataRow>({
 
         {endPage < totalPages && (
           <>
-            {endPage < totalPages - 1 && <span className={styles.ellipsis}>...</span>}
+            {endPage < totalPages - 1 && (
+              <button
+                className={styles.jumpButton}
+                onClick={() => onPageChange(Math.min(totalPages, endPage + jumpSize))}
+                disabled={loading}
+                title={`Forward ${jumpSize} pages`}
+              >
+                <i className="bi bi-chevron-double-right" />
+              </button>
+            )}
             <button
               className={styles.pageButton}
               onClick={() => onPageChange(totalPages)}
@@ -105,6 +126,7 @@ function DataTableInner<T extends DataRow>({
           className={styles.pageButton}
           onClick={() => onPageChange(currentPage + 1)}
           disabled={loading || currentPage === totalPages}
+          title="Next page"
         >
           <i className="bi bi-chevron-right" />
         </button>

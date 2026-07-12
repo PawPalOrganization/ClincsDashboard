@@ -13,7 +13,10 @@ export default function RouteProgress() {
     if (doneTimer.current)  clearTimeout(doneTimer.current);
     if (idleTimer.current)  clearTimeout(idleTimer.current);
 
-    // Start bar
+    // Start bar — synchronous by design: this is a route-change progress-bar
+    // animation, not data synchronization, and deferring it would add a visible
+    // frame of delay before the bar appears.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('running');
 
     // "Complete" it after 500 ms

@@ -63,6 +63,7 @@ export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onCl
   // Load profile on open
   useEffect(() => {
     if (!isOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: flag loading, then fetch
     setProfileLoading(true);
     setProfileError('');
     clinicPetService.getProfile(petId, clinicId)
@@ -74,6 +75,7 @@ export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onCl
   // Load medicines when tab selected
   useEffect(() => {
     if (!isOpen || activeTab !== 'medicines') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: flag loading, then fetch
     setMedicinesLoading(true);
     setMedicinesError('');
     clinicPetService.listMedicines(petId, clinicId, medicineCategory || undefined)
@@ -85,6 +87,7 @@ export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onCl
   // Load history when tab selected or page changes
   useEffect(() => {
     if (!isOpen || activeTab !== 'history') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: flag loading, then fetch
     setHistoryLoading(true);
     setHistoryError('');
     clinicPetService.listAppointments(petId, clinicId, { branchId, status: 'finished', page: historyPage, limit: 10 })

@@ -60,7 +60,7 @@ export default function AppointmentDetail() {
   const [petModalOpen, setPetModalOpen] = useState(false);
 
   useEffect(() => {
-    if (!id || !canView) { setLoading(false); return; }
+    if (!id || !canView) return;
     clinicAppointmentService.getOne(id)
       .then(setAppointment)
       .catch((err) => setLoadError(err instanceof Error ? err.message : 'Failed to load appointment.'))

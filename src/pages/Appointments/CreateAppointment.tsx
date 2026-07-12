@@ -68,14 +68,17 @@ interface NormalizedBranchService {
 // BranchForm.tsx already has to apply for the same reason.
 function normalizeBranchServices(rawServices?: ClinicBranch['services']): NormalizedBranchService[] {
   if (!Array.isArray(rawServices) || rawServices.length === 0) return [];
-  return rawServices
-    .map((s: any): NormalizedBranchService | null => {
-      const id = s.clinicServiceId ?? s.serviceId ?? s.clinicService?.id ?? s.service?.id ?? s.id;
-      if (id == null || Number(id) <= 0) return null;
-      const name: string | undefined = s.name ?? s.clinicService?.name ?? s.service?.name ?? undefined;
+  return (rawServices as unknown[])
+    .map((raw): NormalizedBranchService | null => {
+      const s = raw as Record<string, unknown>;
+      const nestedClinicService = s.clinicService as Record<string, unknown> | undefined;
+      const nestedService = s.service as Record<string, unknown> | undefined;
+      const id = s.clinicServiceId ?? s.serviceId ?? nestedClinicService?.id ?? nestedService?.id ?? s.id;
+      if (id == null || Number(id as number | string) <= 0) return null;
+      const name = (s.name ?? nestedClinicService?.name ?? nestedService?.name ?? undefined) as string | undefined;
       return {
-        clinicServiceId: Number(id),
-        cost: s.cost != null ? Number(s.cost) : 0,
+        clinicServiceId: Number(id as number | string),
+        cost: s.cost != null ? Number(s.cost as number | string) : 0,
         name,
       };
     })
@@ -166,8 +169,13 @@ export default function CreateAppointment() {
       .catch(() => {});
   }, [clinicId]);
 
-  // Fetch doctors + full branch detail (with services/costs) when branch changes
+  // Fetch doctors + full branch detail (with services/costs) when branch changes.
+  // Resets doctor/slot/service selections tied to the previous branch — kept as a
+  // single effect (not split into a render-time adjustment) since the reset and the
+  // fetch it guards must stay atomic for booking correctness, and this path has no
+  // test coverage to safety-net a restructure.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selectedBranch || !clinicId) { setDoctors([]); setSelectedBranchDetail(null); return; }
     setLoadingDoctors(true);
     setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
@@ -183,6 +191,7 @@ export default function CreateAppointment() {
 
   // Reset doctor/slot when date changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
   }, [selectedDate]);
 
@@ -378,7 +387,8 @@ export default function CreateAppointment() {
   function toggleService(id: number) {
     setSelectedServiceIds((p) => {
       const n = new Set(p);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
   }

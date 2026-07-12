@@ -86,10 +86,7 @@ export default function ClinicSettings() {
   const [errorMsg, setErrorMsg]   = useState('');
 
   useEffect(() => {
-    if (!clinicId) {
-      setLoading(false);
-      return;
-    }
+    if (!clinicId) return;
 
     async function fetchClinic() {
       try {

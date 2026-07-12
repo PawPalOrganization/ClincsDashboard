@@ -40,7 +40,12 @@ const INITIAL_STATE: ClinicAuthState = {
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function ClinicAuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<ClinicAuthState>(INITIAL_STATE);
+  // Lazy initializer — if there's no stored session, we already know synchronously
+  // (before the first paint) that isLoading should be false, so the effect below
+  // doesn't need to set it and the app never renders an extra "loading" frame.
+  const [state, setState] = useState<ClinicAuthState>(() =>
+    clinicAuthService.getStoredAuth() ? INITIAL_STATE : { ...INITIAL_STATE, isLoading: false },
+  );
 
   // Hydrate auth state from localStorage on mount.
   // Validates the stored token against the server and uses the server-provided
@@ -49,10 +54,7 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
   // 401 is handled automatically by clinicApi (clears session + redirects).
   useEffect(() => {
     const stored = clinicAuthService.getStoredAuth();
-    if (!stored) {
-      setState((prev) => ({ ...prev, isLoading: false }));
-      return;
-    }
+    if (!stored) return;
 
     // AbortController lets React StrictMode's cleanup cancel the in-flight request
     // before the second (real) mount fires, preventing double-fetch and state races.
@@ -134,6 +136,10 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
+// Co-locating the hook with its Provider is the standard React Context pattern;
+// splitting it into its own file would only avoid a Fast Refresh DX warning at
+// the cost of updating every consumer's import path across the app.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useClinicAuth(): ClinicAuthContextValue {
   const context = useContext(ClinicAuthContext);
   if (!context) {

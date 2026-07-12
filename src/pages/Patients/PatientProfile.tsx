@@ -85,6 +85,7 @@ export default function PatientProfile() {
   const [timelineBranchId, setTimelineBranchId] = useState('');
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- !clinicId/!canView already return early in render; !userId alone is unreachable (route-guaranteed by /patients/:userId) but not provably dead code
     if (!clinicId || !userId || !canView) { setProfileLoading(false); return; }
     setProfileLoading(true);
     setProfileError('');
@@ -103,8 +104,6 @@ export default function PatientProfile() {
     if (!clinicId) return;
     clinicBranchesService.list(clinicId, 1, 100).then((res) => setBranches(res.items)).catch(() => {});
   }, [clinicId]);
-
-  useEffect(() => { setTimelinePage(1); }, [timelineStatus, timelineBranchId]);
 
   const fetchTimeline = useCallback(async () => {
     if (!clinicId || !userId) return;
@@ -130,6 +129,7 @@ export default function PatientProfile() {
 
   useEffect(() => {
     if (activeTab !== 'timeline' || !profile) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: fetchTimeline flags loading, then fetches
     fetchTimeline();
   }, [activeTab, profile, fetchTimeline]);
 
@@ -327,7 +327,7 @@ export default function PatientProfile() {
             <select
               className={styles.filterSelect}
               value={timelineStatus}
-              onChange={(e) => setTimelineStatus(e.target.value as AppointmentStatus | '')}
+              onChange={(e) => { setTimelineStatus(e.target.value as AppointmentStatus | ''); setTimelinePage(1); }}
             >
               <option value="">All statuses</option>
               <option value="reserved">Reserved</option>
@@ -337,7 +337,7 @@ export default function PatientProfile() {
             <select
               className={styles.filterSelect}
               value={timelineBranchId}
-              onChange={(e) => setTimelineBranchId(e.target.value)}
+              onChange={(e) => { setTimelineBranchId(e.target.value); setTimelinePage(1); }}
             >
               <option value="">All branches</option>
               {branches.map((b) => (

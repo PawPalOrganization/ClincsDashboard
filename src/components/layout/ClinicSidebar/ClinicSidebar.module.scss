@@ -295,12 +295,26 @@
 }
 
 .avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
   i {
     font-size: 1.75rem;
     color: #0d9aff;
     display: block;
     line-height: 1;
   }
+}
+
+.avatarPhoto {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .profileText {

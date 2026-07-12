@@ -42,6 +42,9 @@ export default function StaffAssignments({
   );
 
   useEffect(() => {
+    // Re-syncs the checklist when the parent passes a refreshed `staff`/`branches`
+    // (e.g. after a successful save) — a real prop sync, not dead initialization.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedIds(getInitialBranchIds(staff, branches));
     setSuccessMsg('');
     setErrorMsg('');

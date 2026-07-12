@@ -94,14 +94,7 @@ export default function StaffList() {
   }, [search]);
 
   useEffect(() => {
-    setPage(1);
-  }, [selectedBranchId]);
-
-  useEffect(() => {
-    if (!clinicId || !canViewStaff) {
-      setLoadingFilters(false);
-      return;
-    }
+    if (!clinicId || !canViewStaff) return;
 
     async function loadFilters() {
       setLoadingFilters(true);
@@ -158,11 +151,8 @@ export default function StaffList() {
   }, [debouncedSearch, page, selectedBranchId]);
 
   useEffect(() => {
-    if (!clinicId || !canViewStaff) {
-      setLoadingStaff(false);
-      return;
-    }
-
+    if (!clinicId || !canViewStaff) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: fetchStaff flags loading, then fetches
     fetchStaff();
   }, [canViewStaff, clinicId, fetchStaff]);
 
@@ -349,7 +339,7 @@ export default function StaffList() {
           <select
             className={styles.branchSelect}
             value={selectedBranchId}
-            onChange={(e) => setSelectedBranchId(e.target.value)}
+            onChange={(e) => { setSelectedBranchId(e.target.value); setPage(1); }}
             disabled={loadingFilters || !!branchesError}
           >
             <option value="">All visible branches</option>

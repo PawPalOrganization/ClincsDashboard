@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ClinicNotification } from '../../../types/clinic.types';
 import styles from './NotificationToast.module.scss';
@@ -52,8 +52,17 @@ function ToastCard({ item, onDismiss, onNavigate }: CardProps) {
     onNavigate(item.notification);
   }
 
+  // Latest-ref pattern: the mount-only timer below must always call the current
+  // `dismiss` (with the current `exiting` check), not the one closed over at mount —
+  // otherwise a manual dismiss just before the timer fires wouldn't be seen as
+  // "already exiting" and onDismiss could fire twice.
+  const dismissRef = useRef(dismiss);
+  useLayoutEffect(() => {
+    dismissRef.current = dismiss;
+  });
+
   useEffect(() => {
-    const t = setTimeout(dismiss, DURATION);
+    const t = setTimeout(() => dismissRef.current(), DURATION);
     return () => clearTimeout(t);
   }, []);
 

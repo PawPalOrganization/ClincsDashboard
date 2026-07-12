@@ -187,11 +187,7 @@ export default function ClinicDashboard() {
   const staffFirstName = authStaff?.firstName ?? 'Staff';
 
   useEffect(() => {
-    if (!clinicId) {
-      setLoadingStats(false);
-      setLoadingBookings(false);
-      return;
-    }
+    if (!clinicId) return;
 
     const SKIP  = Promise.resolve(null);
     const today = new Date().toISOString().split('T')[0];

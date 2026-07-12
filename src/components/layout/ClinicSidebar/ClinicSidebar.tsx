@@ -84,7 +84,9 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
         (res.meta as unknown as Record<string, unknown>).unreadCount as number
           ?? items.filter((n) => !n.isRead).length,
       );
-    } catch {}
+    } catch {
+      // Silently ignore — the bell dropdown just stays empty until the next poll/Pusher event.
+    }
   }, []);
 
   useEffect(() => {
@@ -126,7 +128,9 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {}
+    } catch {
+      // Silently ignore — the notification stays unread in the UI; user can retry.
+    }
   }
 
   // ── Tab title + favicon — side effects driven by React Query's clinic data ──
@@ -289,7 +293,10 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
       <div className={styles.bottomSection}>
         <div className={styles.profileCard}>
           <div className={styles.avatar}>
-            <i className="bi bi-person-circle" />
+            {staff?.imageUrl
+              ? <img src={staff.imageUrl} alt={staffName} className={styles.avatarPhoto} />
+              : <i className="bi bi-person-circle" />
+            }
           </div>
           <div className={styles.profileText}>
             <div className={styles.greeting}>Logged in as</div>

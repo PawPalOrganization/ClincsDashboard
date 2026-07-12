@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import Pusher from 'pusher-js';
 import type {
   ClinicNotification,
@@ -47,15 +47,19 @@ export function useClinicPusher({
   onDataShareApproved,
   onDataShareDenied,
 }: UseClinicPusherOptions) {
-  // Keep callback refs stable so the effect doesn't re-run when parent re-renders
+  // Keep callback refs stable so the effect doesn't re-run when parent re-renders.
+  // Synced via useLayoutEffect (not assigned during render) so refs never get
+  // mutated during React's render phase — updated before the browser paints,
+  // so no event can fire against a stale callback in between.
   const notificationRef = useRef(onNotification);
-  notificationRef.current = onNotification;
-
   const approvedRef = useRef(onDataShareApproved);
-  approvedRef.current = onDataShareApproved;
-
   const deniedRef = useRef(onDataShareDenied);
-  deniedRef.current = onDataShareDenied;
+
+  useLayoutEffect(() => {
+    notificationRef.current = onNotification;
+    approvedRef.current = onDataShareApproved;
+    deniedRef.current = onDataShareDenied;
+  });
 
   // Deduplicate events that arrive on multiple subscribed channels or on reconnect
   const seenIdsRef = useRef<Set<number | string>>(new Set());

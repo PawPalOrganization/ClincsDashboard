@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { ReactNode } from 'react';
 import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
+import clinicFilesService from '../../services/clinic/clinicFilesService';
+import { ApiError } from '../../services/clinic/clinicApi';
 import type {
   BranchWorkingHour,
   ClinicBranch,
@@ -84,7 +86,30 @@ export default function StaffForm({
   const fieldDisabled = saving || readOnly;
   const [imageUrl, setProfilePhoto_] = useState(defaultValues?.imageUrl ?? '');
   const [imgLoadError, setImgLoadError] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const photoFileInputRef = useRef<HTMLInputElement>(null);
   function setProfilePhoto(val: string) { setProfilePhoto_(val); setImgLoadError(false); }
+
+  async function handlePhotoFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError('');
+    try {
+      const uploaded = await clinicFilesService.upload(file);
+      setProfilePhoto(uploaded.publicUrl);
+    } catch (err) {
+      setUploadError(
+        err instanceof ApiError
+          ? `Upload failed: ${err.message} (${err.status})`
+          : 'Image upload failed. Try pasting a URL instead.',
+      );
+    } finally {
+      setUploading(false);
+      if (photoFileInputRef.current) photoFileInputRef.current.value = '';
+    }
+  }
   const [firstName, setFirstName] = useState(defaultValues?.firstName ?? '');
   const [lastName, setLastName] = useState(defaultValues?.lastName ?? '');
   const [bio, setBio] = useState(defaultValues?.bio ?? '');
@@ -116,27 +141,6 @@ export default function StaffForm({
       prev.map((h) => (h.dayOfWeek === dayOfWeek ? { ...h, [field]: value } : h)),
     );
   }
-
-  useEffect(() => {
-    if (!defaultValues) return;
-    setProfilePhoto(defaultValues.imageUrl ?? '');
-    setFirstName(defaultValues.firstName ?? '');
-    setLastName(defaultValues.lastName ?? '');
-    setBio(defaultValues.bio ?? '');
-    setEmail(defaultValues.email ?? '');
-    setPassword('');
-    setBirthDate(dateInputValue(defaultValues.birthDate));
-    setGender(defaultValues.gender ?? '');
-    setClinicBranchId(
-      defaultValues.clinicBranchId != null ? String(defaultValues.clinicBranchId) : '',
-    );
-    setRoleId(defaultValues.roleId != null ? String(defaultValues.roleId) : '');
-    setYearsOfExperience(
-      defaultValues.yearsOfExperience != null ? String(defaultValues.yearsOfExperience) : '',
-    );
-    setJoinedAt(dateInputValue(defaultValues.joinedAt));
-    setHours(buildHoursState(defaultValues.workingHours));
-  }, [defaultValues]);
 
   function clearError(name: keyof FormErrors) {
     setErrors((prev) => ({ ...prev, [name]: undefined }));
@@ -180,8 +184,10 @@ export default function StaffForm({
       .filter((h) => h.enabled)
       .map((h) => ({ dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }));
 
-    const resolvedImageUrl = imageUrl.trim() || undefined;
-    console.log('[StaffForm] imageUrl being sent:', resolvedImageUrl ?? '(not included)');
+    // `null` (not `undefined`) so an intentionally cleared photo is actually sent to the
+    // backend — `JSON.stringify` drops `undefined` keys, which would silently leave the
+    // previous imageUrl untouched server-side and reappear after the next refetch.
+    const resolvedImageUrl = imageUrl.trim() || null;
 
     const shared = {
       firstName: firstName.trim(),
@@ -254,15 +260,40 @@ export default function StaffForm({
               </div>
             )}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {/* Paste a public image URL */}
-              <input
-                type="text"
-                className={styles.selectInput}
-                placeholder="https://example.com/photo.jpg"
-                value={imageUrl}
-                onChange={(e) => setProfilePhoto(e.target.value)}
-                disabled={fieldDisabled}
-              />
+              <div className={styles.photoUrlRow}>
+                <input
+                  type="text"
+                  className={styles.selectInput}
+                  placeholder="https://example.com/photo.jpg or upload below"
+                  value={imageUrl}
+                  onChange={(e) => setProfilePhoto(e.target.value)}
+                  disabled={fieldDisabled || uploading}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="small"
+                  icon={uploading ? 'bi-arrow-repeat' : 'bi-upload'}
+                  onClick={() => photoFileInputRef.current?.click()}
+                  disabled={fieldDisabled || uploading}
+                >
+                  {uploading ? 'Uploading…' : 'Upload'}
+                </Button>
+                <input
+                  ref={photoFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handlePhotoFileChange}
+                />
+              </div>
+
+              {uploadError && (
+                <p className={styles.photoHint}>
+                  <i className="bi bi-exclamation-triangle-fill" /> {uploadError}
+                </p>
+              )}
+
               {imgLoadError && imageUrl && (
                 <p className={styles.photoHint}>
                   <i className="bi bi-exclamation-triangle-fill" />
@@ -271,13 +302,15 @@ export default function StaffForm({
               )}
 
               {imageUrl && !fieldDisabled && (
-                <button
+                <Button
                   type="button"
-                  className={styles.photoRemoveBtn}
+                  variant="outline"
+                  size="small"
+                  icon="bi-trash"
                   onClick={() => setProfilePhoto('')}
                 >
-                  <i className="bi bi-trash" /> Remove photo
-                </button>
+                  Remove photo
+                </Button>
               )}
             </div>
           </div>

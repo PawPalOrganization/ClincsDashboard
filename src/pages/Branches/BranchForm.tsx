@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { ChangeEvent } from 'react';
 import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
-import MapPicker from '../../components/common/MapPicker/MapPicker';
+import LocationLinkInput from '../../components/common/LocationLinkInput/LocationLinkInput';
 import clinicCatalogService from '../../services/clinic/clinicCatalogService';
 import type {
   BranchService,
@@ -66,16 +66,19 @@ function tagItemLabel(item: TagItem): string {
 
 function buildDefaultServices(rawServices?: BranchService[] | null): ServiceRow[] {
   if (!Array.isArray(rawServices) || rawServices.length === 0) return [];
-  return rawServices
-    .map((s: any) => {
+  return (rawServices as unknown[])
+    .map((raw) => {
       // The API returns branch services as full ClinicService objects: { id, name, cost, ... }
       // The `id` here IS the clinic service ID. We also handle other possible shapes for safety.
+      const s = raw as Record<string, unknown>;
+      const nestedClinicService = s.clinicService as Record<string, unknown> | undefined;
+      const nestedService = s.service as Record<string, unknown> | undefined;
       const id = s.clinicServiceId   // standard field we send in update payload
         ?? s.serviceId               // alternative naming
-        ?? s.clinicService?.id       // nested clinicService join
-        ?? s.service?.id             // nested service join
+        ?? nestedClinicService?.id   // nested clinicService join
+        ?? nestedService?.id         // nested service join
         ?? s.id;                     // actual API shape: full service object with top-level id
-      if (id == null || Number(id) <= 0) return null;
+      if (id == null || Number(id as number | string) <= 0) return null;
       return {
         clinicServiceId: String(id),
         cost: s.cost != null ? String(s.cost) : '0',
@@ -125,6 +128,7 @@ export default function BranchForm({
 
   useEffect(() => {
     if (!clinicId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: flag loading, then fetch
     setCatalogLoading(true);
     clinicCatalogService.list(clinicId, { limit: 100 })
       .then((res) => setCatalog(res.items))
@@ -150,26 +154,6 @@ export default function BranchForm({
   const [hours, setHours]             = useState<HourEntry[]>(() => buildDefaultHours(defaultValues?.workingHours));
 
   const [titleError, setTitleError] = useState('');
-
-  // Re-populate when data arrives after mount (edit mode async fetch)
-  useEffect(() => {
-    if (!defaultValues) return;
-    setTitle(defaultValues.title ?? '');
-    setDescription(defaultValues.description ?? '');
-    setLogoUrl(defaultValues.logoUrl ?? '');
-    setIsMainBranch(defaultValues.isMainBranch ?? false);
-    setIsActive(defaultValues.isActive ?? true);
-    setPhoneNumber(defaultValues.phoneNumber ?? '');
-    setLat(defaultValues.lat != null ? Number(defaultValues.lat) : null);
-    setLng(defaultValues.lng != null ? Number(defaultValues.lng) : null);
-    const addrParts = parseAddressParts(defaultValues.address);
-    setAddressCity(addrParts.city);
-    setAddressArea(addrParts.area);
-    setAddressStreet(addrParts.street);
-    setTags((defaultValues.tags ?? []).map(tagItemLabel).filter(Boolean));
-    setServices(buildDefaultServices(defaultValues.services));
-    setHours(buildDefaultHours(defaultValues.workingHours));
-  }, [defaultValues]);
 
   function commitTag() {
     const value = tagInput.trim().replace(/,+$/, '').trim();
@@ -411,7 +395,7 @@ export default function BranchForm({
           disabled={saving || readOnly}
         />
 
-        <MapPicker
+        <LocationLinkInput
           lat={lat}
           lng={lng}
           onChange={(newLat, newLng) => { setLat(newLat); setLng(newLng); }}

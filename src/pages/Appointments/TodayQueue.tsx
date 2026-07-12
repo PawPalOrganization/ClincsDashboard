@@ -44,6 +44,7 @@ export default function TodayQueue() {
 
   useEffect(() => {
     if (!selectedBranch) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: flag loading, then fetch
     setLoading(true);
     setError('');
     clinicAppointmentService.getToday(selectedBranch)

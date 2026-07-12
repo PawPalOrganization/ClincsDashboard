@@ -72,16 +72,24 @@ export default function AppointmentsList() {
   const [filterBranch, setFilterBranch] = useState('');
   const [filterStatus, setFilterStatus] = useState<AppointmentStatus | ''>('');
   const [filterDate, setFilterDate] = useState('');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const [loading, setLoading] = useState(true);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => { setPage(1); }, [filterBranch, filterStatus, filterDate, debouncedSearch]);
+  // Reset to page 1 whenever the (deferred) search text actually changes — the other
+  // filters already reset page directly in their onChange handlers below. Adjusting
+  // state during render (rather than a dedicated effect) avoids an extra render pass.
+  const [prevDebouncedSearch, setPrevDebouncedSearch] = useState(debouncedSearch);
+  if (debouncedSearch !== prevDebouncedSearch) {
+    setPrevDebouncedSearch(debouncedSearch);
+    setPage(1);
+  }
 
   useEffect(() => {
-    if (!clinicId) { setLoadingBranches(false); return; }
+    if (!clinicId) return;
     clinicBranchesService.list(clinicId, 1, 100)
       .then((res) => setBranches(res.items))
       .catch(() => {})
@@ -100,7 +108,11 @@ export default function AppointmentsList() {
         date: filterDate || undefined,
         name: debouncedSearch.trim() || undefined,
       });
-      setAppointments(result.items as AppRow[]);
+      const sorted = [...result.items].sort((a, b) => {
+        const diff = new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
+        return sortOrder === 'desc' ? -diff : diff;
+      });
+      setAppointments(sorted as AppRow[]);
       setTotal(result.meta.total);
       setPage(result.meta.page);
       setTotalPages(result.meta.totalPages);
@@ -110,10 +122,11 @@ export default function AppointmentsList() {
     } finally {
       setLoading(false);
     }
-  }, [page, filterBranch, filterStatus, filterDate, debouncedSearch]);
+  }, [page, filterBranch, filterStatus, filterDate, debouncedSearch, sortOrder]);
 
   useEffect(() => {
-    if (!clinicId || !canView) { setLoading(false); return; }
+    if (!clinicId || !canView) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: fetchAppointments flags loading, then fetches
     fetchAppointments();
   }, [canView, clinicId, fetchAppointments]);
 
@@ -164,7 +177,16 @@ export default function AppointmentsList() {
     },
     {
       key: 'scheduledAt',
-      label: 'Scheduled',
+      label: (
+        <button
+          type="button"
+          className={styles.sortToggleBtn}
+          onClick={() => { setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc')); setPage(1); }}
+        >
+          Scheduled
+          <i className={`bi ${sortOrder === 'desc' ? 'bi-arrow-down' : 'bi-arrow-up'}`} />
+        </button>
+      ),
       width: '175px',
       render: (row) => {
         const dt = formatDateTime(row.scheduledAt);

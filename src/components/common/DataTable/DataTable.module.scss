@@ -258,9 +258,35 @@
   }
 }
 
-.ellipsis {
+.jumpButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
   padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
   color: #6C757D;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  @media (max-width: 991px) {
+    min-width: 32px;
+    height: 32px;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(13, 154, 255, 0.1);
+    color: #0D9AFF;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 .loadingContainer {

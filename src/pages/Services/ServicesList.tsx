@@ -80,7 +80,8 @@ export default function ServicesList() {
   }, [clinicId, page, debouncedSearch]);
 
   useEffect(() => {
-    if (!clinicId || !canRead) { setLoading(false); return; }
+    if (!clinicId || !canRead) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: fetchServices flags loading, then fetches
     fetchServices();
   }, [canRead, clinicId, fetchServices]);
 

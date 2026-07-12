@@ -91,11 +91,10 @@ export default function DoctorList() {
   }, [search]);
 
   useEffect(() => {
-    setPage(1);
-  }, [selectedBranchId]);
-
-  useEffect(() => {
+    // `loadingFilters` directly controls the branch-select's disabled state below (not
+    // masked by a full-page render guard), so this reset is load-bearing, not dead code.
     if (!clinicId || !canViewStaff || !canLoadBranches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadingFilters(false);
       return;
     }
@@ -145,10 +144,8 @@ export default function DoctorList() {
   }, [debouncedSearch, page, selectedBranchId]);
 
   useEffect(() => {
-    if (!clinicId || !canViewStaff) {
-      setLoadingStaff(false);
-      return;
-    }
+    if (!clinicId || !canViewStaff) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: fetchStaff flags loading, then fetches
     fetchStaff();
   }, [canViewStaff, clinicId, fetchStaff]);
 
@@ -333,7 +330,7 @@ export default function DoctorList() {
           <select
             className={styles.branchSelect}
             value={selectedBranchId}
-            onChange={(e) => setSelectedBranchId(e.target.value)}
+            onChange={(e) => { setSelectedBranchId(e.target.value); setPage(1); }}
             disabled={loadingFilters || !!branchesError}
           >
             <option value="">All visible branches</option>

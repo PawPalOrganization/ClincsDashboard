@@ -41,10 +41,7 @@ export default function DoctorInfo() {
   const [serverError, setServerError] = useState('');
 
   useEffect(() => {
-    if (!clinicId || !staffId || !canViewStaff) {
-      setLoading(false);
-      return;
-    }
+    if (!clinicId || !staffId || !canViewStaff) return;
 
     async function loadDoctor() {
       setLoading(true);
