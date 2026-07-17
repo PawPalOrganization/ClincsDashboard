@@ -19,32 +19,6 @@ interface FormErrors {
   form?: string;
 }
 
-// ─── Inline SVG paw print ─────────────────────────────────────────────────────
-
-function PawSvg() {
-  return (
-    <svg
-      className={styles.pawSvg}
-      viewBox="0 0 120 120"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      {/* toe pads */}
-      <ellipse cx="28" cy="32" rx="11" ry="14" fill="currentColor" opacity="0.9" />
-      <ellipse cx="54" cy="22" rx="11" ry="14" fill="currentColor" opacity="0.9" />
-      <ellipse cx="80" cy="26" rx="11" ry="14" fill="currentColor" opacity="0.9" />
-      <ellipse cx="100" cy="42" rx="10" ry="13" fill="currentColor" opacity="0.9" />
-      {/* main pad */}
-      <path
-        d="M20 75 C18 55 32 44 50 46 C58 47 64 52 70 52 C80 52 94 58 96 76 C99 95 82 108 60 108 C38 108 22 95 20 75Z"
-        fill="currentColor"
-        opacity="0.9"
-      />
-    </svg>
-  );
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Login() {
@@ -130,16 +104,13 @@ export default function Login() {
           <div className={styles.blobTop} />
           <div className={styles.blobBottom} />
 
-          {/* company logo */}
-          <div className={styles.heroLogo}>
-            <img src={logoPawPal} alt="Paw-Pal" className={styles.heroLogoImg} />
-          </div>
-
           {/* center visual */}
           <div className={styles.heroVisual}>
-            {/* paw glow ring */}
+            {/* logo glow ring */}
             <div className={styles.pawGlow}>
-              <PawSvg />
+              <div className={styles.pawGlowMask}>
+                <img src={logoPawPal} alt="Paw-Pal" className={styles.pawGlowImg} />
+              </div>
             </div>
 
             <div className={styles.heroBadge}>

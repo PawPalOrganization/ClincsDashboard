@@ -18,107 +18,82 @@
   letter-spacing: 0.04em;
 }
 
-/* ─────────────────────────────────────────
-   Full cycle: 3 s
-   Phase 1  0 – 63 %  → toes fill one-by-one  (group is static)
-   Phase 2 63 – 88 %  → group + ring spin 360° together
-   Phase 3 88 – 100 % → everything fades, snap back, brief pause
-   ───────────────────────────────────────── */
+/* ── Small inline spinner — three bouncing paw icons ── */
 
-/* ── Group rotation (paw + ring spin as one) ── */
-
-@keyframes groupRotate {
-  /* static during toe-fill phase */
-  0%,  63%  { transform: rotate(0deg); }
-  /* ease in from 0° */
-  65%       { transform: rotate(0deg); }
-  /* one full revolution completes before fade-out */
-  87%       { transform: rotate(360deg); }
-  /* hold position while opacity collapses, then snap back while invisible */
-  100%      { transform: rotate(360deg); }
+.pawDots {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.25em;
 }
 
-/* ── Toe fill keyframes – toes stay filled all through the ring phase ── */
-
-@keyframes toe1Fill {
-  0%,  5%      { fill: transparent; }
-  12%, 85%     { fill: var(--paw-color, #0D9AFF); }
-  92%, 100%    { fill: transparent; }
+.pawDot {
+  width: 1em;
+  height: 1em;
+  animation: pawBounce 1.2s ease-in-out infinite;
 }
 
-@keyframes toe2Fill {
-  0%,  22%     { fill: transparent; }
-  29%, 85%     { fill: var(--paw-color, #0D9AFF); }
-  92%, 100%    { fill: transparent; }
+@keyframes pawBounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: translateY(-30%);
+    opacity: 1;
+  }
 }
 
-@keyframes toe3Fill {
-  0%,  39%     { fill: transparent; }
-  46%, 85%     { fill: var(--paw-color, #0D9AFF); }
-  92%, 100%    { fill: transparent; }
+/* ── Main overlay indicator — PP mark splitting apart and rejoining ──
+   Percentages are relative to each half's own box, so the motion scales
+   automatically with the container size instead of being pinned to a
+   fixed pixel amplitude. */
+
+.ppLoader {
+  position: relative;
+  display: inline-block;
 }
 
-@keyframes toe4Fill {
-  0%,  55%     { fill: transparent; }
-  62%, 85%     { fill: var(--paw-color, #0D9AFF); }
-  92%, 100%    { fill: transparent; }
+.ppHalf {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
 }
 
-/* ── Ring opacity – appears when group starts rotating, fades with toes ── */
-
-@keyframes ringFade {
-  0%,  63%  { opacity: 0; }
-  67%       { opacity: 1; }
-  86%       { opacity: 1; }
-  92%       { opacity: 0; }
-  100%      { opacity: 0; }
+.ppLeft {
+  animation: ppLeftMotion 1.2s cubic-bezier(.65, 0, .35, 1) infinite;
 }
 
-/* ── SVG root ── */
-
-.paw {
-  --paw-color: #0D9AFF;
-  display: block;
-  overflow: visible;
+.ppRight {
+  animation: ppRightMotion 1.2s cubic-bezier(.65, 0, .35, 1) infinite;
 }
 
-/* ── Rotating group ── */
-
-.pawGroup {
-  /* pivot is the paw centre in SVG user-space (viewBox origin at -8,-8,
-     but the paw geometry is still centred on coordinate 50,50) */
-  transform-origin: 50px 50px;
-  animation: groupRotate .8s ease-in-out infinite;
+/* Starts connected, pulses, splits apart, reconnects, pulses, holds. */
+@keyframes ppLeftMotion {
+  0%, 18%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+  24%       { transform: translate(0, 0) rotate(0deg) scale(1.02); }
+  40%, 55%  { transform: translate(-10.25%, -0.8%) rotate(-3deg) scale(1); }
+  77%       { transform: translate(0, 0) rotate(0deg) scale(1); }
+  83%       { transform: translate(0, 0) rotate(0deg) scale(1.025); }
+  89%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
 }
 
-/* ── Paw parts ── */
-
-.mainPad {
-  fill: var(--paw-color, #0D9AFF);
+@keyframes ppRightMotion {
+  0%, 18%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+  24%       { transform: translate(0, 0) rotate(0deg) scale(1.02); }
+  40%, 55%  { transform: translate(10.25%, 0.8%) rotate(3deg) scale(1); }
+  77%       { transform: translate(0, 0) rotate(0deg) scale(1); }
+  83%       { transform: translate(0, 0) rotate(0deg) scale(1.025); }
+  89%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
 }
 
-.toe {
-  fill: transparent;
-  stroke: var(--paw-color, #0D9AFF);
-  stroke-width: 3.5;
+@media (prefers-reduced-motion: reduce) {
+  .pawDot,
+  .ppHalf {
+    animation: none;
+  }
 }
-
-/* thin arc fixed to the group; starts at 12 o'clock via dashoffset */
-.ring {
-  fill: none;
-  stroke: var(--paw-color, #0D9AFF);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-  /* ~65 / 333 circumference ≈ 1/5 arc visible */
-  stroke-dasharray: 65 268;
-  /* shift start from 3 o'clock to 12 o'clock: quarter of circumference */
-  stroke-dashoffset: 83;
-  animation: ringFade .8s ease-in-out infinite;
-}
-
-/* ── Toe animations (all 3 s, synced with group) ── */
-
-.toe1 { animation: toe1Fill .5s ease-in-out infinite; }
-.toe2 { animation: toe2Fill .5s ease-in-out infinite; }
-.toe3 { animation: toe3Fill .5s ease-in-out infinite; }
-.toe4 { animation: toe4Fill .5s ease-in-out infinite; }

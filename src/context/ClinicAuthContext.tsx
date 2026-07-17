@@ -1,8 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ApiResponse, ClinicStaff } from '../types/clinic.types';
+import type { ClinicStaff } from '../types/clinic.types';
 import clinicAuthService from '../services/clinic/clinicAuthService';
-import clinicApi, { ApiError } from '../services/clinic/clinicApi';
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -39,61 +38,25 @@ const INITIAL_STATE: ClinicAuthState = {
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
+// Hydrates auth state straight from localStorage — there is no server-side session
+// endpoint for the clinic portal (no GET /clinic/api/auth/me), so there's nothing to
+// validate against on mount. A stale/invalid token is caught by the next real API
+// call via clinicApi's global 401 handler, which clears the session and redirects.
+function hydrateFromStorage(): ClinicAuthState {
+  const stored = clinicAuthService.getStoredAuth();
+  if (!stored) return { ...INITIAL_STATE, isLoading: false };
+  return {
+    staff: stored.staff,
+    token: stored.token,
+    clinicId: stored.clinicId,
+    branchId: stored.branchId,
+    isAuthenticated: true,
+    isLoading: false,
+  };
+}
+
 export function ClinicAuthProvider({ children }: { children: ReactNode }) {
-  // Lazy initializer — if there's no stored session, we already know synchronously
-  // (before the first paint) that isLoading should be false, so the effect below
-  // doesn't need to set it and the app never renders an extra "loading" frame.
-  const [state, setState] = useState<ClinicAuthState>(() =>
-    clinicAuthService.getStoredAuth() ? INITIAL_STATE : { ...INITIAL_STATE, isLoading: false },
-  );
-
-  // Hydrate auth state from localStorage on mount.
-  // Validates the stored token against the server and uses the server-provided
-  // staff object (eliminating S-2/S-3 client-side permission tampering risk).
-  // Falls back to localStorage staff when /auth/me is not yet deployed (404).
-  // 401 is handled automatically by clinicApi (clears session + redirects).
-  useEffect(() => {
-    const stored = clinicAuthService.getStoredAuth();
-    if (!stored) return;
-
-    // AbortController lets React StrictMode's cleanup cancel the in-flight request
-    // before the second (real) mount fires, preventing double-fetch and state races.
-    const controller = new AbortController();
-
-    clinicApi.get<ApiResponse<ClinicStaff>>('/auth/me', undefined, { signal: controller.signal })
-      .then((res) => {
-        setState({
-          staff: res.data,
-          token: stored.token,
-          clinicId: stored.clinicId,
-          branchId: stored.branchId,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-      })
-      .catch((err) => {
-        // Effect was cleaned up (StrictMode unmount or fast navigation) — do nothing
-        if (controller.signal.aborted) return;
-
-        // 404 = /auth/me not yet deployed on backend — use cached staff as fallback
-        if (err instanceof ApiError && err.status === 404) {
-          setState({
-            staff: stored.staff,
-            token: stored.token,
-            clinicId: stored.clinicId,
-            branchId: stored.branchId,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-          return;
-        }
-        // Any other error (network failure, etc.) — log out for safety
-        clinicAuthService.logout();
-        setState((prev) => ({ ...prev, isLoading: false }));
-      });
-
-    return () => controller.abort();
-  }, []);
+  const [state, setState] = useState<ClinicAuthState>(hydrateFromStorage);
 
   // Calls the service, then mirrors the result into React state.
   // Errors (wrong password, network) propagate to the login page.

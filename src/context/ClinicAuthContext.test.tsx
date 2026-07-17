@@ -3,7 +3,7 @@ import { render, waitFor, act } from '@testing-library/react';
 import { ClinicAuthProvider, useClinicAuth } from './ClinicAuthContext';
 import clinicAuthService from '../services/clinic/clinicAuthService';
 import type { StoredAuth } from '../services/clinic/clinicAuthService';
-import { makeStaff, mockFetchOk, mockFetchError } from '../test/factories';
+import { makeStaff } from '../test/factories';
 
 // ─── Helper: renders the provider and exposes context value via a test component
 
@@ -24,27 +24,20 @@ function renderProvider(onValue: (v: ReturnType<typeof useClinicAuth>) => void) 
 // ─── Hydration from localStorage ──────────────────────────────────────────────
 
 describe('ClinicAuthProvider hydration', () => {
-  it('starts with isLoading=true then resolves to false', async () => {
-    vi.spyOn(clinicAuthService, 'getStoredAuth').mockReturnValue(null);
-    const values: boolean[] = [];
-    renderProvider((ctx) => values.push(ctx.isLoading));
-    await waitFor(() => expect(values).toContain(false));
-  });
-
-  it('is unauthenticated when no stored auth', async () => {
+  it('is unauthenticated when no stored auth', () => {
     vi.spyOn(clinicAuthService, 'getStoredAuth').mockReturnValue(null);
     let ctx!: ReturnType<typeof useClinicAuth>;
     renderProvider((c) => { ctx = c; });
-    await waitFor(() => expect(ctx.isLoading).toBe(false));
+    expect(ctx.isLoading).toBe(false);
     expect(ctx.isAuthenticated).toBe(false);
     expect(ctx.staff).toBeNull();
     expect(ctx.token).toBeNull();
   });
 
-  it('is authenticated when stored auth is present and /auth/me succeeds', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      mockFetchOk({ data: makeStaff() }),
-    );
+  // There is no server-side session-validation endpoint for the clinic portal
+  // (no GET /clinic/api/auth/me), so hydration trusts localStorage directly and
+  // synchronously — no fetch, no loading flicker, no fallback branches to test.
+  it('is authenticated immediately from stored auth, with no server round trip', () => {
     const storedAuth: StoredAuth = {
       token: 'stored-token',
       staff: makeStaff(),
@@ -54,30 +47,10 @@ describe('ClinicAuthProvider hydration', () => {
     vi.spyOn(clinicAuthService, 'getStoredAuth').mockReturnValue(storedAuth);
     let ctx!: ReturnType<typeof useClinicAuth>;
     renderProvider((c) => { ctx = c; });
-    await waitFor(() => expect(ctx.isAuthenticated).toBe(true));
+    expect(ctx.isLoading).toBe(false);
+    expect(ctx.isAuthenticated).toBe(true);
     expect(ctx.token).toBe('stored-token');
     expect(ctx.clinicId).toBe('5');
-    expect(ctx.staff?.email).toBe('jane@clinic.com');
-  });
-
-  it('falls back to stored staff when /auth/me returns 404 (endpoint not yet deployed)', async () => {
-    Object.defineProperty(window, 'location', {
-      value: { pathname: '/dashboard', href: '' },
-      writable: true,
-    });
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      mockFetchError(404, { message: 'Not Found' }),
-    );
-    const storedAuth: StoredAuth = {
-      token: 'stored-token',
-      staff: makeStaff(),
-      clinicId: '5',
-      branchId: '10',
-    };
-    vi.spyOn(clinicAuthService, 'getStoredAuth').mockReturnValue(storedAuth);
-    let ctx!: ReturnType<typeof useClinicAuth>;
-    renderProvider((c) => { ctx = c; });
-    await waitFor(() => expect(ctx.isAuthenticated).toBe(true));
     expect(ctx.staff?.email).toBe('jane@clinic.com');
   });
 });
@@ -141,10 +114,7 @@ describe('ClinicAuthProvider login', () => {
 // ─── Logout action ────────────────────────────────────────────────────────────
 
 describe('ClinicAuthProvider logout', () => {
-  it('clears auth state after logout', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      mockFetchOk({ data: makeStaff() }),
-    );
+  it('clears auth state after logout', () => {
     const storedAuth: StoredAuth = {
       token: 'tok',
       staff: makeStaff(),
@@ -156,7 +126,7 @@ describe('ClinicAuthProvider logout', () => {
 
     let ctx!: ReturnType<typeof useClinicAuth>;
     renderProvider((c) => { ctx = c; });
-    await waitFor(() => expect(ctx.isAuthenticated).toBe(true));
+    expect(ctx.isAuthenticated).toBe(true);
 
     act(() => ctx.logout());
 

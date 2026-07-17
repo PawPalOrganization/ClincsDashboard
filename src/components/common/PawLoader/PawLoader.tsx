@@ -1,4 +1,6 @@
 import { createPortal } from 'react-dom';
+import loaderLeft from '../../../assets/images/loader-pp-left.png';
+import loaderRight from '../../../assets/images/loader-pp-right.png';
 import styles from './PawLoader.module.css';
 
 type Size = 'small' | 'medium' | 'large';
@@ -7,7 +9,6 @@ interface PawLoaderProps {
   size?: Size;
   overlay?: boolean;
   label?: string;
-  color?: string;
 }
 
 const SIZE_PX: Record<Size, number> = {
@@ -16,82 +17,27 @@ const SIZE_PX: Record<Size, number> = {
   large: 140,
 };
 
-function PawSVG({ px, color }: { px: number; color?: string }) {
-  const style = color ? ({ '--paw-color': color } as React.CSSProperties) : undefined;
-
+// ─── Small inline spinner (buttons, inline status rows) — three bouncing paw
+// icons, matching the admin dashboard's PawLoader so both apps feel consistent.
+function PawDots({ px }: { px: number }) {
   return (
-    <svg
-      width={px}
-      height={px}
-      /*
-        viewBox is expanded by 8 px on each side (-8 -8 116 116) so the
-        spinning ring (r=53, centered at 50,50) is never clipped by the
-        SVG viewport box — overflow:visible handles the rest.
-      */
-      viewBox="-8 -8 116 116"
-      xmlns="http://www.w3.org/2000/svg"
-      className={styles.paw}
-      style={style}
-      aria-label="Loading…"
-      role="img"
-    >
-      {/*
-        Single group containing everything.
-        During the ring phase (63–88 % of the 3 s cycle) the whole group
-        rotates 360°, so the paw and the arc spin together as one unit.
-        transform-origin is the paw centre in SVG user-space coordinates.
-      */}
-      <g className={styles.pawGroup}>
+    <span className={styles.pawDots} style={{ height: px * 0.35 }} aria-label="Loading…" role="img">
+      {[0, 1, 2].map((i) => (
+        <svg key={i} className={styles.pawDot} style={{ animationDelay: `${i * 0.2}s` }} viewBox="0 0 512 512" fill="currentColor">
+          <path d="M226.5 92.9c14.3 42.9-.3 86.2-32.6 96.8s-70.1-15.6-84.4-58.5.3-86.2 32.6-96.8 70.1 15.6 84.4 58.5zM100.4 198.6c18.9 32.4 14.3 70.1-10.2 84.1s-59.7-.9-78.5-33.3S-2.7 179.3 21.8 165.3s59.7.9 78.6 33.3zM69.2 401.2C121.6 259.9 214.7 224 256 224s134.4 35.9 186.8 177.2c3.6 9.7 5.2 20.1 5.2 30.5v1.6c0 25.8-20.9 46.7-46.7 46.7-11.5 0-22.9-1.4-34-4.2l-88-22c-15.3-3.8-31.3-3.8-46.6 0l-88 22c-11.1 2.8-22.5 4.2-34 4.2-25.8 0-46.7-20.9-46.7-46.7v-1.6c0-10.4 1.6-20.8 5.2-30.5zM318 128.4c-14.3-42.9.3-86.2 32.6-96.8s70.1 15.6 84.4 58.5-.3 86.2-32.6 96.8-70.1-15.6-84.4-58.5zm131.4 163.3c-18.9-32.4-14.3-70.1 10.2-84.1s59.7.9 78.5 33.3 14.3 70.1-10.2 84.1-59.7-.9-78.5-33.3z" />
+        </svg>
+      ))}
+    </span>
+  );
+}
 
-        {/*
-          Thin arc — always centred on the paw, arc starts at 12 o'clock
-          (stroke-dashoffset shifts it from the default 3 o'clock position).
-          Fades in when the group starts rotating, fades out with the toes.
-        */}
-        <circle className={styles.ring} cx="50" cy="50" r="53" />
-
-        {/* Main central pad — always solid */}
-        <path
-          className={styles.mainPad}
-          d="
-            M 50 88
-            C 37 88, 17 77, 17 63
-            C 17 53, 27 51, 39 51
-            C 43 51, 46 49, 50 49
-            C 54 49, 57 51, 61 51
-            C 73 51, 83 53, 83 63
-            C 83 77, 63 88, 50 88 Z
-          "
-        />
-
-        {/* Toe 1 — far-left, angled outward */}
-        <ellipse
-          className={`${styles.toe} ${styles.toe1}`}
-          cx="19" cy="38" rx="7" ry="9"
-          transform="rotate(-20 19 38)"
-        />
-
-        {/* Toe 2 — upper-left centre */}
-        <ellipse
-          className={`${styles.toe} ${styles.toe2}`}
-          cx="37" cy="25" rx="8" ry="10"
-        />
-
-        {/* Toe 3 — upper-right centre */}
-        <ellipse
-          className={`${styles.toe} ${styles.toe3}`}
-          cx="63" cy="25" rx="8" ry="10"
-        />
-
-        {/* Toe 4 — far-right, angled outward */}
-        <ellipse
-          className={`${styles.toe} ${styles.toe4}`}
-          cx="81" cy="38" rx="7" ry="9"
-          transform="rotate(20 81 38)"
-        />
-
-      </g>
-    </svg>
+// ─── Main overlay indicator — the PP mark splitting apart and rejoining ──────
+function PpLogoLoader({ px }: { px: number }) {
+  return (
+    <span className={styles.ppLoader} style={{ width: px, height: px }} aria-label="Loading…" role="img">
+      <img src={loaderLeft} alt="" className={`${styles.ppHalf} ${styles.ppLeft}`} />
+      <img src={loaderRight} alt="" className={`${styles.ppHalf} ${styles.ppRight}`} />
+    </span>
   );
 }
 
@@ -99,19 +45,18 @@ export default function PawLoader({
   size = 'medium',
   overlay = false,
   label,
-  color,
 }: PawLoaderProps) {
   const px = SIZE_PX[size];
 
   if (overlay) {
     return createPortal(
       <div className={styles.overlay}>
-        <PawSVG px={px} color={color} />
+        <PpLogoLoader px={px} />
         {label && <span className={styles.overlayLabel}>{label}</span>}
       </div>,
       document.body,
     );
   }
 
-  return <PawSVG px={px} color={color} />;
+  return <PawDots px={px} />;
 }

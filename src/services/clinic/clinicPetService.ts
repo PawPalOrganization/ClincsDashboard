@@ -1,5 +1,5 @@
 import clinicApi from './clinicApi';
-import type { ApiResponse, PaginatedList, PetMedicine, PetProfile, Appointment, AppointmentStatus } from '../../types/clinic.types';
+import type { ApiResponse, PaginatedList, PaginationMeta, PetMedicine, PetProfile, Appointment, AppointmentStatus } from '../../types/clinic.types';
 
 interface PetAppointmentParams {
   branchId?: string | number;
@@ -7,6 +7,8 @@ interface PetAppointmentParams {
   page?: number;
   limit?: number;
 }
+
+type PetAppointmentsResponse = ApiResponse<PaginatedList<Appointment>> | ApiResponse<Appointment[]>;
 
 const clinicPetService = {
   // GET /clinic/api/pets/:petId?clinicId=
@@ -49,11 +51,28 @@ const clinicPetService = {
       limit: params.limit ?? 10,
     };
     if (params.branchId != null) query.branchId = String(params.branchId);
-    const res = await clinicApi.get<ApiResponse<PaginatedList<Appointment>>>(
+    const res = await clinicApi.get<PetAppointmentsResponse>(
       `/pets/${petId}/appointments`,
       query,
     );
-    return res.data;
+
+    const raw = res.data;
+    // Same convention as clinicAppointmentService.list: the backend sometimes returns
+    // { data: [...], meta: {...} } with meta top-level rather than nested inside data —
+    // without this normalization, res.data.items/.meta come back undefined and crash callers.
+    if (Array.isArray(raw)) {
+      const topMeta = (res as unknown as Record<string, unknown>).meta as PaginationMeta | undefined;
+      return {
+        items: raw,
+        meta: {
+          total:      topMeta?.total      ?? raw.length,
+          page:       topMeta?.page       ?? params.page ?? 1,
+          limit:      topMeta?.limit      ?? params.limit ?? raw.length,
+          totalPages: topMeta?.totalPages ?? 1,
+        },
+      };
+    }
+    return raw;
   },
 };
 

@@ -91,7 +91,10 @@ export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onCl
     setHistoryLoading(true);
     setHistoryError('');
     clinicPetService.listAppointments(petId, clinicId, { branchId, status: 'finished', page: historyPage, limit: 10 })
-      .then((res) => { setHistory(res.items); setHistoryTotalPages(res.meta.totalPages); })
+      .then((res) => {
+        setHistory(Array.isArray(res.items) ? res.items : []);
+        setHistoryTotalPages(res.meta?.totalPages ?? 1);
+      })
       .catch((err) => setHistoryError(err instanceof Error ? err.message : 'Failed to load visit history.'))
       .finally(() => setHistoryLoading(false));
   }, [isOpen, activeTab, petId, clinicId, branchId, historyPage]);
@@ -321,9 +324,9 @@ export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onCl
                           {appt.doctor.role ? ` · ${appt.doctor.role.name}` : ''}
                         </p>
                       )}
-                      {appt.services.length > 0 && (
+                      {(appt.services ?? []).length > 0 && (
                         <p style={{ margin: 0, fontSize: '0.75rem', color: '#9ca3af' }}>
-                          {appt.services.map((s) => s.name ?? `#${s.clinicServiceId}`).join(', ')}
+                          {(appt.services ?? []).map((s) => s.name ?? `#${s.clinicServiceId}`).join(', ')}
                         </p>
                       )}
                     </div>

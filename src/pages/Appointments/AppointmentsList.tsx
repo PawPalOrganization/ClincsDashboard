@@ -107,7 +107,12 @@ export default function AppointmentsList() {
         status: (filterStatus as AppointmentStatus) || undefined,
         date: filterDate || undefined,
         name: debouncedSearch.trim() || undefined,
+        sortBy: 'scheduledAt',
+        sortOrder,
       });
+      // Re-sort the page locally too: this keeps ordering correct within the page even
+      // if the backend doesn't yet honor sortBy/sortOrder, though it can't fix ordering
+      // *across* pages — that requires the backend to actually apply it before paginating.
       const sorted = [...result.items].sort((a, b) => {
         const diff = new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime();
         return sortOrder === 'desc' ? -diff : diff;

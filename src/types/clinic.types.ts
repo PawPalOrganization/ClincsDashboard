@@ -335,6 +335,8 @@ export interface AppointmentListParams {
   clinicServiceId?: string | number;
   phone?: string;
   name?: string;
+  sortBy?: 'scheduledAt';
+  sortOrder?: 'asc' | 'desc';
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

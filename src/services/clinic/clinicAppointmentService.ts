@@ -25,6 +25,8 @@ const clinicAppointmentService = {
       clinicServiceId: params.clinicServiceId,
       phone: params.phone,
       name: params.name,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
     });
 
     const raw = res.data;
