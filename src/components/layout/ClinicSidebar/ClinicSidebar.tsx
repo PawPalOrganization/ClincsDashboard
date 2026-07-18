@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/appointments', icon: 'bi-calendar-check',    label: 'Appointments', permission: 'appointments.read'     },
   { path: '/patients',     icon: 'bi-person-lines-fill', label: 'Patients',     permission: 'users.read'            },
   { path: '/services',     icon: 'bi-scissors',          label: 'Services',     permission: 'clinic-services.read'  },
+  { path: '/reviews',      icon: 'bi-star',              label: 'Reviews',      permission: 'reviews.read'          },
   { path: '/staff',        icon: 'bi-people',            label: 'Staff',        permission: 'clinic-staff.read'     },
   { path: '/settings',     icon: 'bi-gear',              label: 'Settings',     permission: 'clinics.read'          },
 ];
@@ -151,6 +152,12 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
     };
   }, [clinic]);
 
+  function notificationTargetPath(n: ClinicNotification): string {
+    if (n.data?.appointmentId) return `/appointments/${n.data.appointmentId}`;
+    if (n.type?.startsWith('review_')) return '/reviews';
+    return '/appointments';
+  }
+
   const visibleNavItems = NAV_ITEMS.filter(
     (item) => !item.permission || hasClinicPermission(staff, item.permission),
   );
@@ -249,11 +256,7 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
                     onClick={() => {
                       if (!n.isRead) handleMarkRead(n.id);
                       setBellOpen(false);
-                      if (n.data?.appointmentId) {
-                        navigate(`/appointments/${n.data.appointmentId}`);
-                      } else {
-                        navigate('/appointments');
-                      }
+                      navigate(notificationTargetPath(n));
                     }}
                   >
                     {/* Plain text only — do NOT change to dangerouslySetInnerHTML */}
@@ -280,13 +283,7 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
       <NotificationToast
         toasts={toasts}
         onDismiss={dismissToast}
-        onNavigate={(n) => {
-          if (n.data?.appointmentId) {
-            navigate(`/appointments/${n.data.appointmentId}`);
-          } else {
-            navigate('/appointments');
-          }
-        }}
+        onNavigate={(n) => navigate(notificationTargetPath(n))}
       />
 
       {/* Bottom: profile card + logout */}

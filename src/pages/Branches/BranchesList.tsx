@@ -127,6 +127,18 @@ export default function BranchesList() {
       },
     },
     {
+      key: 'rating',
+      label: 'Rating',
+      width: '110px',
+      render: (row) => row.reviewsCount
+        ? (
+          <span className={styles.countBadge}>
+            <i className="bi bi-star-fill" style={{ color: '#f59e0b' }} /> {(row.avgRating ?? 0).toFixed(1)} ({row.reviewsCount})
+          </span>
+        )
+        : <span className={styles.noData}>No reviews</span>,
+    },
+    {
       key: 'workingHours',
       label: 'Days Open',
       width: '100px',
@@ -230,7 +242,7 @@ export default function BranchesList() {
 
       {/* ── Table / skeleton ── */}
       {isInitialLoad ? (
-        <TablePageSkeleton columns={6} rows={6} />
+        <TablePageSkeleton columns={7} rows={6} />
       ) : (
         <DataTable
           columns={columns}

@@ -5,6 +5,8 @@ import type {
   ClinicStaff,
   DataShareApprovedEvent,
   DataShareDeniedEvent,
+  Review,
+  ReviewDeletedEvent,
 } from '../types/clinic.types';
 
 const PUSHER_KEY     = import.meta.env.VITE_PUSHER_KEY     as string | undefined;
@@ -37,6 +39,9 @@ interface UseClinicPusherOptions {
   onNotification: (n: ClinicNotification) => void;
   onDataShareApproved?: (event: DataShareApprovedEvent) => void;
   onDataShareDenied?: (event: DataShareDeniedEvent) => void;
+  onReviewCreated?: (review: Review) => void;
+  onReviewUpdated?: (review: Review) => void;
+  onReviewDeleted?: (event: ReviewDeletedEvent) => void;
 }
 
 export function useClinicPusher({
@@ -46,6 +51,9 @@ export function useClinicPusher({
   onNotification,
   onDataShareApproved,
   onDataShareDenied,
+  onReviewCreated,
+  onReviewUpdated,
+  onReviewDeleted,
 }: UseClinicPusherOptions) {
   // Keep callback refs stable so the effect doesn't re-run when parent re-renders.
   // Synced via useLayoutEffect (not assigned during render) so refs never get
@@ -54,11 +62,17 @@ export function useClinicPusher({
   const notificationRef = useRef(onNotification);
   const approvedRef = useRef(onDataShareApproved);
   const deniedRef = useRef(onDataShareDenied);
+  const reviewCreatedRef = useRef(onReviewCreated);
+  const reviewUpdatedRef = useRef(onReviewUpdated);
+  const reviewDeletedRef = useRef(onReviewDeleted);
 
   useLayoutEffect(() => {
     notificationRef.current = onNotification;
     approvedRef.current = onDataShareApproved;
     deniedRef.current = onDataShareDenied;
+    reviewCreatedRef.current = onReviewCreated;
+    reviewUpdatedRef.current = onReviewUpdated;
+    reviewDeletedRef.current = onReviewDeleted;
   });
 
   // Deduplicate events that arrive on multiple subscribed channels or on reconnect
@@ -89,6 +103,18 @@ export function useClinicPusher({
         if (!data?.id || seenIdsRef.current.has(data.id)) return;
         seenIdsRef.current.add(data.id);
         notificationRef.current(data);
+      });
+
+      channel.bind('review.created', (data: Review) => {
+        reviewCreatedRef.current?.(data);
+      });
+
+      channel.bind('review.updated', (data: Review) => {
+        reviewUpdatedRef.current?.(data);
+      });
+
+      channel.bind('review.deleted', (data: ReviewDeletedEvent) => {
+        reviewDeletedRef.current?.(data);
       });
 
       channel.bind('pusher:subscription_error', (err: unknown) => {

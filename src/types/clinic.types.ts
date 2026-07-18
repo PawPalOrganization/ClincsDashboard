@@ -88,6 +88,9 @@ export interface Clinic {
   coverUrl?: string;
   email?: string;
   website?: string;
+  avgRating?: number;
+  reviewsCount?: number;
+  reviewsEnabled?: boolean;
 }
 
 // ─── Branches ─────────────────────────────────────────────────────────────────
@@ -114,6 +117,9 @@ export interface ClinicBranch {
   services?: BranchService[];
   tags?: Array<string | number | { id?: string | number; name?: string; title?: string }>;
   workingHours?: BranchWorkingHour[];
+  avgRating?: number;
+  reviewsCount?: number;
+  reviewsEnabled?: boolean;
 }
 
 // ─── Services ─────────────────────────────────────────────────────────────────
@@ -586,4 +592,38 @@ export interface PatientAppointmentListParams {
   limit?: number;
   status?: AppointmentStatus;
   branchId?: string | number;
+}
+
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+// Read-only on the clinic portal — no create/edit/delete. Reviews are left by
+// pet owners after a finished appointment (mobile app), and appear here plus
+// stream in live over Pusher (private-branch-{branchId} → review.created/updated/deleted).
+
+export interface Review {
+  id: string | number;
+  clinicId?: number;
+  clinicBranchId?: number;
+  branch?: { id: number | string; title: string } | null;
+  appointmentId?: number;
+  userId?: number;
+  rating: number;
+  comment?: string | null;
+  reviewerName?: string | null;
+  user?: { firstName?: string; lastName?: string } | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// GET /clinic/api/clinics/:clinicId/reviews?sort=&page=&limit=
+// GET /clinic/api/clinics/:clinicId/branches/:branchId/reviews?sort=&page=&limit=
+export interface ReviewListParams {
+  page?: number;
+  limit?: number;
+  sort?: 'latest' | 'highest' | 'lowest';
+}
+
+// Pusher payload on private-branch-{branchId} → review.deleted
+export interface ReviewDeletedEvent {
+  id: string | number;
+  clinicBranchId?: number;
 }

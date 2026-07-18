@@ -1,0 +1,227 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pageTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a1d2e;
+  margin: 0 0 0.2rem;
+}
+
+.pageSubtitle {
+  font-size: 0.825rem;
+  color: #9ba3af;
+  margin: 0;
+}
+
+// ─── Rating summary ───────────────────────────────────────────────────────────
+
+.ratingSummary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid #e4e7ec;
+  border-radius: 0.875rem;
+  background: #ffffff;
+  padding: 0.75rem 1.125rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.ratingSummaryText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.ratingValue {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a1d2e;
+  line-height: 1.1;
+}
+
+.ratingCount {
+  font-size: 0.75rem;
+  color: #9ba3af;
+}
+
+.reviewsDisabledBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #b91c1c;
+  background: #fee2e2;
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+// ─── Stars ────────────────────────────────────────────────────────────────────
+
+.stars {
+  display: inline-flex;
+  gap: 0.1rem;
+  color: #f59e0b;
+  font-size: 0.85rem;
+
+  i.bi-star {
+    color: #e0e3e8;
+  }
+}
+
+.starsLg {
+  font-size: 1.35rem;
+}
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.filterSelect {
+  min-height: 42px;
+  min-width: 170px;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.625rem;
+  background: #ffffff;
+  color: #2c3e50;
+  font: inherit;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0d9aff;
+    box-shadow: 0 0 0 3px rgba(13, 154, 255, 0.1);
+  }
+
+  &:disabled {
+    background: #f8f9fa;
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+.feedbackAlert {
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+// ─── Table cells ──────────────────────────────────────────────────────────────
+
+.reviewerCell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+
+  span {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a1d2e;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0d9aff 0%, #0069cc 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.commentText {
+  font-size: 0.85rem;
+  color: #4b5563;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.branchPill {
+  display: inline-flex;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cellText {
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.noData {
+  color: #c4c9d4;
+  font-size: 0.85rem;
+}
+
+// ─── Guards ───────────────────────────────────────────────────────────────────
+
+.noClinic,
+.accessDenied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 45vh;
+  padding: 2rem;
+  text-align: center;
+  color: #9ba3af;
+
+  i {
+    font-size: 2.75rem;
+    color: #f59e0b;
+  }
+
+  h2 {
+    color: #1a1d2e;
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  p {
+    max-width: 420px;
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+}

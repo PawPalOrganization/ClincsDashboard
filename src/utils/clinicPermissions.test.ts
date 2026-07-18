@@ -120,6 +120,12 @@ describe('hasClinicPermission', () => {
     expect(hasClinicPermission(staff, 'users.search')).toBe(false);
   });
 
+  it('matches the reviews.read permission slug', () => {
+    const staff = makeStaffWithPermissions(['reviews.read']);
+    expect(hasClinicPermission(staff, 'reviews.read')).toBe(true);
+    expect(hasClinicPermission(staff, 'users.read')).toBe(false);
+  });
+
   it('handles all 22 permission slugs', () => {
     const ALL_SLUGS = [
       'clinics.read', 'clinics.create', 'clinics.update', 'clinics.delete', 'clinics.approve',
