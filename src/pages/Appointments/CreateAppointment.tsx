@@ -164,7 +164,7 @@ export default function CreateAppointment() {
     clinicBranchesService.list(clinicId, 1, 100)
       .then((r) => setBranches(r.items))
       .catch(() => {});
-    clinicCatalogService.list(clinicId, { limit: 100 })
+    clinicCatalogService.list(clinicId, { limit: 100, scope: 'all' })
       .then((r) => setCatalog(r.items))
       .catch(() => {});
   }, [clinicId]);

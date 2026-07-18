@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicCatalogService from '../../services/clinic/clinicCatalogService';
+import clinicServiceCategoriesService from '../../services/clinic/clinicServiceCategoriesService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
 import { ApiError } from '../../services/clinic/clinicApi';
-import type { ClinicService } from '../../types/clinic.types';
+import type { ClinicService, ClinicServiceCategory } from '../../types/clinic.types';
 import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
 import Button from '../../components/common/Button/Button';
@@ -28,10 +29,14 @@ export default function ServicesList() {
   const [page, setPage]             = useState(1);
   const [search, setSearch]         = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterCategoryId, setFilterCategoryId] = useState('');
 
   const [loading, setLoading]       = useState(true);
   const [hasLoaded, setHasLoaded]   = useState(false);
   const [error, setError]           = useState('');
+
+  const [categories, setCategories]         = useState<ClinicServiceCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
   // ── Modals ─────────────────────────────────────────────────────────────────
   type ModalMode = 'create' | 'edit' | 'delete' | null;
@@ -39,9 +44,14 @@ export default function ServicesList() {
   const [selected, setSelected]     = useState<ClinicService | null>(null);
 
   const [formName, setFormName]         = useState('');
+  const [formNameAr, setFormNameAr]     = useState('');
   const [formDesc, setFormDesc]         = useState('');
+  const [formDescAr, setFormDescAr]     = useState('');
   const [formLogoUrl, setFormLogoUrl]   = useState('');
+  const [formCategoryId, setFormCategoryId] = useState('');
+  const [formHomeService, setFormHomeService] = useState(false);
   const [formNameError, setFormNameError] = useState('');
+  const [formCategoryError, setFormCategoryError] = useState('');
   const [formError, setFormError]       = useState('');
   const [saving, setSaving]             = useState(false);
 
@@ -67,6 +77,8 @@ export default function ServicesList() {
         page,
         limit: LIMIT,
         search: debouncedSearch || undefined,
+        categoryId: filterCategoryId || undefined,
+        scope: 'clinic',
       });
       setServices(result.items as ServiceRow[]);
       setTotal(result.meta.total);
@@ -77,7 +89,7 @@ export default function ServicesList() {
     } finally {
       setLoading(false);
     }
-  }, [clinicId, page, debouncedSearch]);
+  }, [clinicId, page, debouncedSearch, filterCategoryId]);
 
   useEffect(() => {
     if (!clinicId || !canRead) return;
@@ -85,19 +97,41 @@ export default function ServicesList() {
     fetchServices();
   }, [canRead, clinicId, fetchServices]);
 
+  // Category picker — a flat, unpaginated list used for both the create/edit form and the list filter.
+  useEffect(() => {
+    if (!canRead) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: flags loading, then fetches
+    setLoadingCategories(true);
+    clinicServiceCategoriesService.list({ limit: 100 })
+      .then((res) => setCategories(res.items))
+      .catch(() => setCategories([]))
+      .finally(() => setLoadingCategories(false));
+  }, [canRead]);
+
   // ── Open modals ────────────────────────────────────────────────────────────
   function openCreate() {
-    setFormName(''); setFormDesc(''); setFormLogoUrl('');
-    setFormNameError(''); setFormError('');
+    setFormName(''); setFormNameAr(''); setFormDesc(''); setFormDescAr(''); setFormLogoUrl('');
+    setFormCategoryId(''); setFormHomeService(false);
+    setFormNameError(''); setFormCategoryError(''); setFormError('');
     setSelected(null);
     setModal('create');
   }
 
   function openEdit(service: ClinicService) {
     setFormName(service.name);
+    setFormNameAr(service.nameAr ?? '');
     setFormDesc(service.description ?? '');
+    setFormDescAr(service.descriptionAr ?? '');
     setFormLogoUrl(service.logoUrl ?? '');
-    setFormNameError(''); setFormError('');
+    setFormCategoryId(
+      service.clinicServiceCategoryId != null
+        ? String(service.clinicServiceCategoryId)
+        : service.category?.id != null
+          ? String(service.category.id)
+          : '',
+    );
+    setFormHomeService(service.homeServiceAvailable ?? false);
+    setFormNameError(''); setFormCategoryError(''); setFormError('');
     setSelected(service);
     setModal('edit');
   }
@@ -131,13 +165,20 @@ export default function ServicesList() {
 
   // ── Submit handlers ────────────────────────────────────────────────────────
   async function handleCreate() {
-    if (!formName.trim()) { setFormNameError('Service name is required.'); return; }
+    let hasError = false;
+    if (!formName.trim()) { setFormNameError('Service name is required.'); hasError = true; }
+    if (!formCategoryId) { setFormCategoryError('Category is required.'); hasError = true; }
+    if (hasError) return;
     setSaving(true); setFormError('');
     try {
       await clinicCatalogService.create(clinicId!, {
         name: formName.trim(),
+        nameAr: formNameAr.trim() || null,
         description: formDesc.trim() || null,
+        descriptionAr: formDescAr.trim() || null,
         logoUrl: formLogoUrl.trim() || null,
+        homeServiceAvailable: formHomeService,
+        clinicServiceCategoryId: Number(formCategoryId),
       });
       closeModal();
       setPage(1);
@@ -146,6 +187,8 @@ export default function ServicesList() {
       const msg = err instanceof ApiError ? err.message : 'Failed to create service.';
       if (msg.toLowerCase().includes('already exists')) {
         setFormNameError('A service with this name already exists.');
+      } else if (msg.toLowerCase().includes('category')) {
+        setFormCategoryError(msg);
       } else {
         setFormError(msg);
       }
@@ -155,13 +198,20 @@ export default function ServicesList() {
   }
 
   async function handleEdit() {
-    if (!formName.trim()) { setFormNameError('Service name is required.'); return; }
+    let hasError = false;
+    if (!formName.trim()) { setFormNameError('Service name is required.'); hasError = true; }
+    if (!formCategoryId) { setFormCategoryError('Category is required.'); hasError = true; }
+    if (hasError) return;
     setSaving(true); setFormError('');
     try {
       await clinicCatalogService.update(clinicId!, selected!.id, {
         name: formName.trim(),
+        nameAr: formNameAr.trim() || null,
         description: formDesc.trim() || null,
+        descriptionAr: formDescAr.trim() || null,
         logoUrl: formLogoUrl.trim() || null,
+        homeServiceAvailable: formHomeService,
+        clinicServiceCategoryId: Number(formCategoryId),
       });
       closeModal();
       fetchServices();
@@ -171,6 +221,8 @@ export default function ServicesList() {
         setFormError('Platform services cannot be modified from the clinic portal.');
       } else if (msg.toLowerCase().includes('already exists')) {
         setFormNameError('A service with this name already exists.');
+      } else if (msg.toLowerCase().includes('category')) {
+        setFormCategoryError(msg);
       } else {
         setFormError(msg);
       }
@@ -207,6 +259,7 @@ export default function ServicesList() {
           }
           <div>
             <span className={styles.serviceName}>{row.name}</span>
+            {row.nameAr && <span className={styles.serviceNameAr} dir="rtl">{row.nameAr}</span>}
             {row.isPlatform && (
               <span className={styles.platformBadge}>
                 <i className="bi bi-shield-check" /> Platform
@@ -219,18 +272,26 @@ export default function ServicesList() {
     {
       key: 'description',
       label: 'Description',
-      width: '35%',
+      width: '30%',
       render: (row) => row.description
         ? <span className={styles.descText}>{String(row.description)}</span>
         : <span className={styles.noData}>—</span>,
     },
     {
-      key: 'type',
-      label: 'Type',
-      width: '120px',
-      render: (row) => row.isPlatform
-        ? <span className={styles.typePlatform}>Platform</span>
-        : <span className={styles.typeOwned}>Your clinic</span>,
+      key: 'category',
+      label: 'Category',
+      width: '150px',
+      render: (row) => row.category
+        ? <span className={styles.categoryBadge}>{row.category.name}</span>
+        : <span className={styles.noData}>—</span>,
+    },
+    {
+      key: 'homeServiceAvailable',
+      label: 'Home Service',
+      width: '110px',
+      render: (row) => row.homeServiceAvailable
+        ? <span className={styles.homeServiceYes}><i className="bi bi-house-check" /> Yes</span>
+        : <span className={styles.noData}>—</span>,
     },
   ];
 
@@ -300,8 +361,21 @@ export default function ServicesList() {
               </button>
             )}
           </div>
+
+          <select
+            className={styles.filterSelect}
+            value={filterCategoryId}
+            onChange={(e) => { setFilterCategoryId(e.target.value); setPage(1); }}
+            disabled={loadingCategories}
+          >
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={String(c.id)}>{c.name}</option>
+            ))}
+          </select>
+
           <div className={styles.infoHint}>
-            <i className="bi bi-info-circle" /> Platform services are global and read-only. Your clinic services are private and fully editable.
+            <i className="bi bi-info-circle" /> This catalog only shows services your clinic created. Platform-wide services can be offered per branch from Branch settings.
           </div>
         </div>
       )}
@@ -340,28 +414,85 @@ export default function ServicesList() {
             <div className={styles.modalBody}>
               {formError && <div className="alert alert-danger py-2">{formError}</div>}
 
-              <div className={styles.field}>
-                <label className={styles.label}>Service Name <span className={styles.required}>*</span></label>
-                <input
-                  className={`${styles.input} ${formNameError ? styles.inputError : ''}`}
-                  value={formName}
-                  onChange={(e) => { setFormName(e.target.value); setFormNameError(''); }}
-                  placeholder="e.g. Dental Cleaning"
-                  disabled={saving}
-                />
-                {formNameError && <span className={styles.errorMsg}>{formNameError}</span>}
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label className={styles.label}>Service Name <span className={styles.required}>*</span></label>
+                  <input
+                    className={`${styles.input} ${formNameError ? styles.inputError : ''}`}
+                    value={formName}
+                    onChange={(e) => { setFormName(e.target.value); setFormNameError(''); }}
+                    placeholder="e.g. Dental Cleaning"
+                    disabled={saving}
+                  />
+                  {formNameError && <span className={styles.errorMsg}>{formNameError}</span>}
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.label}>Name (Arabic)</label>
+                  <input
+                    className={styles.input}
+                    dir="rtl"
+                    value={formNameAr}
+                    onChange={(e) => setFormNameAr(e.target.value)}
+                    placeholder="اسم الخدمة"
+                    disabled={saving}
+                  />
+                </div>
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Description</label>
-                <textarea
-                  className={styles.textarea}
-                  value={formDesc}
-                  onChange={(e) => setFormDesc(e.target.value)}
-                  placeholder="Optional description…"
-                  rows={2}
-                  disabled={saving}
-                />
+                <label className={styles.label}>Category <span className={styles.required}>*</span></label>
+                <select
+                  className={`${styles.input} ${formCategoryError ? styles.inputError : ''}`}
+                  value={formCategoryId}
+                  onChange={(e) => { setFormCategoryId(e.target.value); setFormCategoryError(''); }}
+                  disabled={saving || loadingCategories}
+                >
+                  <option value="">{loadingCategories ? 'Loading categories…' : 'Select a category'}</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={String(c.id)}>{c.name}</option>
+                  ))}
+                </select>
+                {formCategoryError && <span className={styles.errorMsg}>{formCategoryError}</span>}
+              </div>
+
+              <div className={styles.fieldRow}>
+                <div className={styles.field}>
+                  <label className={styles.label}>Description</label>
+                  <textarea
+                    className={styles.textarea}
+                    value={formDesc}
+                    onChange={(e) => setFormDesc(e.target.value)}
+                    placeholder="Optional description…"
+                    rows={2}
+                    disabled={saving}
+                  />
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.label}>Description (Arabic)</label>
+                  <textarea
+                    className={styles.textarea}
+                    dir="rtl"
+                    value={formDescAr}
+                    onChange={(e) => setFormDescAr(e.target.value)}
+                    placeholder="وصف اختياري…"
+                    rows={2}
+                    disabled={saving}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.field}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={formHomeService}
+                    onChange={(e) => setFormHomeService(e.target.checked)}
+                    disabled={saving}
+                  />
+                  Home service available
+                </label>
               </div>
 
               <div className={styles.field}>

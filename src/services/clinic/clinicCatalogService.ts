@@ -18,7 +18,13 @@ const clinicCatalogService = {
   ): Promise<PaginatedList<ClinicService>> {
     const res = await clinicApi.get<unknown>(
       `/clinics/${clinicId}/services`,
-      { page: params.page ?? 1, limit: params.limit ?? 50, search: params.search },
+      {
+        page: params.page ?? 1,
+        limit: params.limit ?? 50,
+        search: params.search,
+        categoryId: params.categoryId,
+        scope: params.scope,
+      },
     );
     const raw = res as Record<string, unknown>;
     const data = (raw.data ?? []) as ClinicService[];

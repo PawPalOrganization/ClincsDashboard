@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { ChangeEvent } from 'react';
 import Input from '../../components/common/Input/Input';
 import Button from '../../components/common/Button/Button';
@@ -125,16 +125,22 @@ export default function BranchForm({
 }: BranchFormProps) {
   const [catalog, setCatalog] = useState<ClinicService[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
 
-  useEffect(() => {
+  const fetchCatalog = useCallback(() => {
     if (!clinicId) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: flag loading, then fetch
     setCatalogLoading(true);
-    clinicCatalogService.list(clinicId, { limit: 100 })
+    setCatalogError('');
+    clinicCatalogService.list(clinicId, { limit: 100, scope: 'all' })
       .then((res) => setCatalog(res.items))
-      .catch(() => {})
+      .catch((err) => setCatalogError(err instanceof Error ? err.message : 'Failed to load service catalog.'))
       .finally(() => setCatalogLoading(false));
   }, [clinicId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: flag loading, then fetch
+    fetchCatalog();
+  }, [fetchCatalog]);
   const [title, setTitle]             = useState(defaultValues?.title ?? '');
   const [description, setDescription] = useState(defaultValues?.description ?? '');
   const [logoUrl, setLogoUrl]         = useState(defaultValues?.logoUrl ?? '');
@@ -176,16 +182,8 @@ export default function BranchForm({
     setTags((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function addServiceRow() {
-    setServices((prev) => [...prev, { clinicServiceId: '', cost: '' }]);
-  }
-
   function updateServiceRow(index: number, field: 'clinicServiceId' | 'cost', value: string) {
     setServices((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
-  }
-
-  function removeServiceRow(index: number) {
-    setServices((prev) => prev.filter((_, i) => i !== index));
   }
 
   function toggleDay(day: number) {
@@ -504,7 +502,28 @@ export default function BranchForm({
         <div className={styles.field}>
           <label className={styles.fieldLabel}>Services & Pricing</label>
 
-          {catalog.length > 0 ? (
+          {catalogLoading && (
+            <p className={styles.fieldHint}><i className="bi bi-arrow-repeat" /> Loading service catalog…</p>
+          )}
+
+          {!catalogLoading && catalogError && (
+            <div className={styles.catalogErrorBox}>
+              <p className={styles.fieldHint}>
+                <i className="bi bi-exclamation-triangle" style={{ color: '#e74c3c' }} /> Couldn't load the service catalog: {catalogError}
+              </p>
+              <button type="button" className={styles.addServiceBtn} onClick={fetchCatalog}>
+                <i className="bi bi-arrow-clockwise" /> Retry
+              </button>
+            </div>
+          )}
+
+          {!catalogLoading && !catalogError && catalog.length === 0 && (
+            <p className={styles.fieldHint}>
+              <i className="bi bi-info-circle" /> No services in your catalog yet. Add services from the Services page before assigning them to a branch.
+            </p>
+          )}
+
+          {!catalogLoading && !catalogError && catalog.length > 0 && (
             <>
               {catalog.map((svc) => {
                 const existingIdx = services.findIndex((s) => s.clinicServiceId === String(svc.id));
@@ -550,60 +569,6 @@ export default function BranchForm({
               <p className={styles.fieldHint}>
                 <i className="bi bi-exclamation-circle" style={{ color: '#f59e0b' }} /> Enter the cost (EGP) for each selected service — this will appear to staff when booking appointments.
               </p>
-            </>
-          ) : (
-            <>
-              {catalogLoading && (
-                <p className={styles.fieldHint}><i className="bi bi-arrow-repeat" /> Loading service catalog…</p>
-              )}
-              {!catalogLoading && services.map((row, index) => (
-                <div key={index} className={styles.serviceRow}>
-                  <input
-                    type="number"
-                    className={styles.serviceIdInput}
-                    placeholder="Service ID"
-                    min={1}
-                    value={row.clinicServiceId}
-                    onChange={(e) => updateServiceRow(index, 'clinicServiceId', e.target.value)}
-                    disabled={saving || readOnly}
-                  />
-                  <input
-                    type="number"
-                    className={styles.serviceCostInput}
-                    placeholder="Cost"
-                    min={0}
-                    step="0.01"
-                    value={row.cost}
-                    onChange={(e) => updateServiceRow(index, 'cost', e.target.value)}
-                    disabled={saving || readOnly}
-                  />
-                  {!readOnly && (
-                    <button
-                      type="button"
-                      className={styles.serviceRowRemove}
-                      onClick={() => removeServiceRow(index)}
-                      aria-label="Remove service"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-              {!catalogLoading && !readOnly && (
-                <button
-                  type="button"
-                  className={styles.addServiceBtn}
-                  onClick={addServiceRow}
-                  disabled={saving}
-                >
-                  <i className="bi bi-plus-circle" /> Add Service
-                </button>
-              )}
-              {!catalogLoading && (
-                <p className={styles.fieldHint}>
-                  <i className="bi bi-info-circle" /> Service IDs are assigned in the admin dashboard. Your admin must add services to the catalog before they appear here.
-                </p>
-              )}
             </>
           )}
         </div>

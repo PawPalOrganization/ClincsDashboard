@@ -123,30 +123,61 @@ export interface BranchService {
   cost: number;
 }
 
+export interface ClinicServiceCategory {
+  id: number;
+  name: string;
+  nameAr?: string | null;
+  description?: string | null;
+  descriptionAr?: string | null;
+  logoUrl?: string | null;
+}
+
 export interface ClinicService {
   id: string | number;
   clinicId: number | null;
   isPlatform: boolean;
   name: string;
+  nameAr?: string | null;
   description?: string;
+  descriptionAr?: string | null;
   logoUrl?: string | null;
+  homeServiceAvailable?: boolean;
+  clinicServiceCategoryId?: number | null;
+  category?: ClinicServiceCategory | null;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface CreateClinicServicePayload {
   name: string;
+  nameAr?: string | null;
   description?: string | null;
+  descriptionAr?: string | null;
   logoUrl?: string | null;
+  homeServiceAvailable?: boolean;
+  clinicServiceCategoryId: number;
 }
 
 export interface UpdateClinicServicePayload {
   name?: string;
+  nameAr?: string | null;
   description?: string | null;
+  descriptionAr?: string | null;
   logoUrl?: string | null;
+  homeServiceAvailable?: boolean;
+  clinicServiceCategoryId?: number;
 }
 
 export interface ClinicServiceListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  categoryId?: number | string;
+  /** 'all' (default) = platform catalog (clinicId null) + this clinic's own services. 'clinic' = this clinic's own services only. */
+  scope?: 'all' | 'clinic';
+}
+
+export interface ClinicServiceCategoryListParams {
   page?: number;
   limit?: number;
   search?: string;

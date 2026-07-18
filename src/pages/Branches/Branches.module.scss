@@ -520,35 +520,6 @@
 
 // ─── Service rows ─────────────────────────────────────────────────────────────
 
-.serviceRow {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.serviceIdInput {
-  flex: 1;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.875rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  color: #111827;
-  background: #fff;
-  outline: none;
-  transition: border-color 0.15s;
-
-  &:focus {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(13, 154, 255, 0.12);
-  }
-
-  &:disabled {
-    background: #f9fafb;
-    cursor: not-allowed;
-  }
-}
-
 .serviceCostInput {
   width: 110px;
   padding: 0.45rem 0.75rem;
@@ -576,27 +547,18 @@
   background: #fffbeb;
 }
 
-.serviceRowRemove {
-  display: inline-flex;
+.catalogErrorBox {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  font-size: 1rem;
-  color: #6b7280;
-  background: none;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  cursor: pointer;
-  padding: 0;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
-  flex-shrink: 0;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
 
-  &:hover {
-    background: #fee2e2;
-    color: #dc2626;
-    border-color: #fca5a5;
-  }
+  .fieldHint { margin: 0; }
 }
 
 .addServiceBtn {

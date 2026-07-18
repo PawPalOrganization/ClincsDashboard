@@ -72,6 +72,21 @@
   &:hover { color: #6b7280; }
 }
 
+.filterSelect {
+  padding: 0.5rem 0.75rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+  background: white;
+  outline: none;
+  cursor: pointer;
+  min-width: 160px;
+  transition: border-color 0.15s;
+
+  &:focus { border-color: #0d9aff; }
+}
+
 .infoHint {
   font-size: 0.78rem;
   color: #6b7280;
@@ -120,6 +135,33 @@
   display: block;
 }
 
+.serviceNameAr {
+  font-size: 0.78rem;
+  color: #6b7280;
+  display: block;
+  margin-top: 0.1rem;
+}
+
+.categoryBadge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(107, 33, 168, 0.08);
+  color: #6b21a8;
+  border: 1px solid rgba(107, 33, 168, 0.2);
+  border-radius: 20px;
+  padding: 0.2rem 0.65rem;
+}
+
+.homeServiceYes {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #059669;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
 .platformBadge {
   font-size: 0.68rem;
   font-weight: 600;
@@ -143,28 +185,6 @@
 }
 
 .noData { color: #9ca3af; }
-
-.typePlatform {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: rgba(13, 154, 255, 0.08);
-  color: #0d9aff;
-  border: 1px solid rgba(13, 154, 255, 0.25);
-  border-radius: 20px;
-  padding: 0.2rem 0.65rem;
-}
-
-.typeOwned {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: rgba(16, 185, 129, 0.08);
-  color: #059669;
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  border-radius: 20px;
-  padding: 0.2rem 0.65rem;
-}
 
 // ─── Access denied ────────────────────────────────────────────────────────────
 
@@ -251,6 +271,33 @@
   margin-bottom: 1rem;
 
   &:last-child { margin-bottom: 0; }
+}
+
+.fieldRow {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+
+  .field { flex: 1; margin-bottom: 0; }
+
+  @media (max-width: 480px) { flex-direction: column; }
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+    accent-color: #0d9aff;
+  }
 }
 
 .label {
