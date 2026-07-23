@@ -27,12 +27,18 @@ import styles from './Analytics.module.scss';
 // (no categorical CVD pairing needed since gray carries no hue to confuse).
 const NEUTRAL = '#cbd5e1';
 
+// Categorical palette for the per-branch revenue lines — fixed order, validated
+// with the dataviz skill's CVD checker (adjacent + all-pairs both clear every
+// hard gate; the sub-3:1 contrast WARN is mitigated by the visible chart legend).
+// Capped at 4 slots per the skill's series-count ladder — branches beyond the
+// 4th (sorted by id, so assignment stays stable across refetches) fold into
+// a single neutral "Other branches" line rather than growing the palette.
+const BRANCH_COLORS = ['#0d9aff', '#f59e0b', '#8b5cf6', '#10b981'];
+const OTHER_BRANCHES_COLOR = '#9ca3af';
+const MAX_BRANCH_SERIES = BRANCH_COLORS.length;
+
 type ServiceRow = DashboardServiceItem & { id: number } & Record<string, unknown>;
 type SortColumn = 'bookings' | 'profit';
-
-// Consistent with the accent hexes already used across ClinicDashboard.tsx —
-// no categorical chart palette exists in variables.css yet.
-const SERIES_COLORS = ['#0d9aff', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#14b8a6'];
 
 function formatBucketLabel(bucket: string, grain: DashboardGrain): string {
   const parts = bucket.split('-').map(Number);
@@ -201,6 +207,12 @@ export default function AnalyticsDashboard() {
   const branchCount = kpis?.branches ?? branchCountFallback;
   const showPerBranch = (branchCount ?? 0) > 1;
 
+  // Total is the default view — the per-branch line count is a real categorical
+  // series (not a redundant overlay on Total), so it's an opt-in toggle rather
+  // than always-on, per the dataviz method's "one axis, don't mix a total with
+  // its own components" guidance.
+  const [chartView, setChartView] = useState<'total' | 'byBranch'>('total');
+
   // ── Render guards ──────────────────────────────────────────────────────────
   if (!clinicId) {
     return (
@@ -228,16 +240,26 @@ export default function AnalyticsDashboard() {
   // ── Revenue chart data ─────────────────────────────────────────────────────
   const branchMeta = new Map<number, string>();
   revenue?.points.forEach((p) => p.byBranch.forEach((b) => branchMeta.set(b.clinicBranchId, b.branchTitle)));
-  const branchIds = Array.from(branchMeta.keys());
+  // Sorted by id (a stable, rank-independent order) so a given branch always
+  // keeps the same color slot across refetches — color follows the entity,
+  // never a revenue-based rank that could shuffle between date ranges.
+  const allBranchIds = Array.from(branchMeta.keys()).sort((a, b) => a - b);
+  const seriesBranchIds = allBranchIds.slice(0, MAX_BRANCH_SERIES);
+  const overflowBranchIds = allBranchIds.slice(MAX_BRANCH_SERIES);
 
   const chartData = revenue?.points.map((p) => {
     const row: Record<string, number | string> = {
       bucket: formatBucketLabel(p.bucket, revenue.grain),
       revenue: p.revenue,
     };
-    branchIds.forEach((id) => {
+    seriesBranchIds.forEach((id) => {
       row[`branch_${id}`] = p.byBranch.find((b) => b.clinicBranchId === id)?.revenue ?? 0;
     });
+    if (overflowBranchIds.length > 0) {
+      row.branch_other = p.byBranch
+        .filter((b) => overflowBranchIds.includes(b.clinicBranchId))
+        .reduce((sum, b) => sum + b.revenue, 0);
+    }
     return row;
   }) ?? [];
 
@@ -394,11 +416,31 @@ export default function AnalyticsDashboard() {
             <div className={styles.section}>
               <div className={styles.card}>
                 <div className={styles.cardHeader}>
-                  <h2 className={styles.cardTitle}>Revenue Over Time</h2>
-                  {revenue && (
-                    <span className={styles.cardMeta}>
-                      {revenue.grain === 'daily' ? 'Daily' : 'Monthly'} · {revenue.period.startDate} to {revenue.period.endDate}
-                    </span>
+                  <div>
+                    <h2 className={styles.cardTitle}>Revenue Over Time</h2>
+                    {revenue && (
+                      <span className={styles.cardMeta}>
+                        {revenue.grain === 'daily' ? 'Daily' : 'Monthly'} · {revenue.period.startDate} to {revenue.period.endDate}
+                      </span>
+                    )}
+                  </div>
+                  {showPerBranch && (
+                    <div className={styles.viewToggle} role="group" aria-label="Revenue view">
+                      <button
+                        type="button"
+                        className={chartView === 'total' ? styles.viewToggleActive : styles.viewToggleBtn}
+                        onClick={() => setChartView('total')}
+                      >
+                        Total
+                      </button>
+                      <button
+                        type="button"
+                        className={chartView === 'byBranch' ? styles.viewToggleActive : styles.viewToggleBtn}
+                        onClick={() => setChartView('byBranch')}
+                      >
+                        By Branch
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -420,26 +462,39 @@ export default function AnalyticsDashboard() {
                       <XAxis dataKey="bucket" tick={{ fontSize: 12, fill: '#6b7280' }} />
                       <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} width={70} />
                       <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="revenue"
-                        name="Total Revenue"
-                        stroke="#0d9aff"
-                        strokeWidth={2.5}
-                        dot={false}
-                      />
-                      {showPerBranch && branchIds.map((id, i) => (
+                      {showPerBranch && chartView === 'byBranch' && <Legend />}
+                      {(!showPerBranch || chartView === 'total') && (
+                        <Line
+                          type="monotone"
+                          dataKey="revenue"
+                          name="Total Revenue"
+                          stroke="#0d9aff"
+                          strokeWidth={2.5}
+                          dot={false}
+                        />
+                      )}
+                      {showPerBranch && chartView === 'byBranch' && seriesBranchIds.map((id, i) => (
                         <Line
                           key={id}
                           type="monotone"
                           dataKey={`branch_${id}`}
                           name={branchMeta.get(id) ?? `Branch ${id}`}
-                          stroke={SERIES_COLORS[(i + 1) % SERIES_COLORS.length]}
-                          strokeWidth={1.5}
+                          stroke={BRANCH_COLORS[i % BRANCH_COLORS.length]}
+                          strokeWidth={2}
                           dot={false}
                         />
                       ))}
+                      {showPerBranch && chartView === 'byBranch' && overflowBranchIds.length > 0 && (
+                        <Line
+                          type="monotone"
+                          dataKey="branch_other"
+                          name={`Other branches (${overflowBranchIds.length})`}
+                          stroke={OTHER_BRANCHES_COLOR}
+                          strokeWidth={2}
+                          strokeDasharray="4 3"
+                          dot={false}
+                        />
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
                 )}

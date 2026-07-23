@@ -26,6 +26,20 @@ function reviewerName(row: Review): string {
   return 'Anonymous';
 }
 
+// The backend's nested-branch field on a review row isn't pinned down by the Postman
+// collection (no saved example responses) — the admin dashboard hit the same gap and
+// found the field is sometimes `clinicBranch`, not `branch`. Check both, then fall back
+// to looking the id up in the branches list this page already loads for the filter
+// dropdown — that only needs `clinicBranchId`, which is reliably present, so it works
+// regardless of what (or whether) the backend names the nested relation.
+function branchTitleFor(row: Review, branchesById: Map<string, string>): string | undefined {
+  const nested = row.branch?.title
+    ?? (row as unknown as { clinicBranch?: { title?: string } }).clinicBranch?.title;
+  if (nested) return nested;
+  if (row.clinicBranchId != null) return branchesById.get(String(row.clinicBranchId));
+  return undefined;
+}
+
 function formatDate(value?: string): string {
   if (!value) return '';
   const date = new Date(value);
@@ -135,6 +149,11 @@ export default function ReviewsList() {
     [branches, selectedBranchId],
   );
 
+  const branchesById = useMemo(
+    () => new Map(branches.map((b) => [String(b.id), b.title])),
+    [branches],
+  );
+
   const headerAvgRating = selectedBranch ? selectedBranch.avgRating : clinic?.avgRating;
   const headerReviewsCount = selectedBranch ? selectedBranch.reviewsCount : clinic?.reviewsCount;
   const headerReviewsEnabled = selectedBranch ? selectedBranch.reviewsEnabled : clinic?.reviewsEnabled;
@@ -168,9 +187,12 @@ export default function ReviewsList() {
       key: 'branch',
       label: 'Branch',
       width: '160px',
-      render: (row: ReviewRow) => row.branch?.title
-        ? <span className={styles.branchPill}>{row.branch.title}</span>
-        : <span className={styles.noData}>—</span>,
+      render: (row: ReviewRow) => {
+        const title = branchTitleFor(row, branchesById);
+        return title
+          ? <span className={styles.branchPill}>{title}</span>
+          : <span className={styles.noData}>—</span>;
+      },
     }]),
     {
       key: 'createdAt',

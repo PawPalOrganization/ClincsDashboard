@@ -8,6 +8,13 @@ import clinicCatalogService from '../../services/clinic/clinicCatalogService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
 import clinicUserSearchService from '../../services/clinic/clinicUserSearchService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
+import {
+  clearAppointmentDraft,
+  isDraftEmpty,
+  readAppointmentDraft,
+  writeAppointmentDraft,
+} from '../../utils/appointmentDraft';
+import type { AppointmentDraft } from '../../utils/appointmentDraft';
 import type {
   BranchWorkingHour,
   ClinicBranch,
@@ -17,6 +24,7 @@ import type {
 } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import PawLoader from '../../components/common/PawLoader/PawLoader';
+import Modal from '../../components/common/Modal/Modal';
 import styles from './Appointments.module.scss';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -146,6 +154,16 @@ export default function CreateAppointment() {
   const [notes, setNotes] = useState('');
   const [catalog, setCatalog] = useState<ClinicService[]>([]);
 
+  // ── Resumable draft ────────────────────────────────────────────────────────
+  const [pendingDraft, setPendingDraft] = useState<AppointmentDraft | null>(null);
+  // Computed once, when the draft is detected (not at render time — `Date.now()` is
+  // an impure call and isn't allowed in the render path) rather than a live-ticking
+  // clock; an approximate "N min ago" at detection time is all the banner needs.
+  const [pendingDraftMinutesAgo, setPendingDraftMinutesAgo] = useState(0);
+  const [draftReady, setDraftReady] = useState(false);
+  const [isRestoringDraft, setIsRestoringDraft] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
   // Lookup map: clinicServiceId → name from catalog
   const catalogMap = new Map(catalog.map((s) => [Number(s.id), s.name]));
 
@@ -173,13 +191,20 @@ export default function CreateAppointment() {
   // Resets doctor/slot/service selections tied to the previous branch — kept as a
   // single effect (not split into a render-time adjustment) since the reset and the
   // fetch it guards must stay atomic for booking correctness, and this path has no
-  // test coverage to safety-net a restructure.
+  // test coverage to safety-net a restructure. The reset is skipped while a saved
+  // draft is being restored (isRestoringDraft) — otherwise this effect would wipe
+  // the very doctor/slot/service selections the draft just set, since restoring
+  // `selectedBranch` from '' is a real dependency change like any other. The
+  // fetches still run either way — a fresh doctors list/branch detail is needed
+  // regardless of how selectedBranch was set.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selectedBranch || !clinicId) { setDoctors([]); setSelectedBranchDetail(null); return; }
     setLoadingDoctors(true);
-    setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
-    setSelectedServiceIds(new Set());
+    if (!isRestoringDraft) {
+      setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
+      setSelectedServiceIds(new Set());
+    }
     clinicBranchesService.getOne(clinicId, selectedBranch)
       .then((b) => setSelectedBranchDetail(b))
       .catch(() => setSelectedBranchDetail(null));
@@ -187,13 +212,61 @@ export default function CreateAppointment() {
       .then((r) => setDoctors(r.items.filter(isDoctor)))
       .catch(() => {})
       .finally(() => setLoadingDoctors(false));
-  }, [selectedBranch, clinicId]);
+  }, [selectedBranch, clinicId, isRestoringDraft]);
 
-  // Reset doctor/slot when date changes
+  // Reset doctor/slot when date changes — also skipped while restoring a draft, for
+  // the same reason as the branch effect above.
   useEffect(() => {
+    if (isRestoringDraft) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
-  }, [selectedDate]);
+  }, [selectedDate, isRestoringDraft]);
+
+  // Turns `isRestoringDraft` back off after the render where the two effects above
+  // have had a chance to see it as true and skip their resets. Must stay declared
+  // after both of them — React runs a commit's effects in declaration order, so
+  // this only flips the flag back once they've already read it.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isRestoringDraft) setIsRestoringDraft(false);
+  }, [isRestoringDraft]);
+
+  // Look for a resumable draft once, on mount — surfaced via the resume banner
+  // rather than applied automatically (see handleResumeDraft), so a different staff
+  // member opening this page on a shared terminal isn't silently dropped into
+  // someone else's half-filled booking.
+  useEffect(() => {
+    if (!clinicId || !authStaff) return;
+    const draft = readAppointmentDraft(clinicId, authStaff.id);
+    if (draft) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPendingDraft(draft);
+      setPendingDraftMinutesAgo(Math.max(1, Math.round((Date.now() - draft.savedAt) / 60000)));
+    } else {
+      setDraftReady(true);
+    }
+  }, [clinicId, authStaff]);
+
+  // Auto-save the in-progress booking so it survives navigating away and back —
+  // only once the resume/start-over decision from the effect above is resolved,
+  // so this can't stomp an unresumed draft with blank initial state first.
+  useEffect(() => {
+    if (!draftReady || !clinicId || !authStaff) return;
+    const draft: AppointmentDraft = {
+      savedAt: Date.now(),
+      step, selectedBranch, selectedDate, selectedDoctor, selectedSlot, manualTimes,
+      isWalkIn, lookupMethod, lookupValue, consentPhase, pendingUserId, foundIdentifier,
+      approvedUser, selectedPetId, walkInName, walkInPhone,
+      selectedServiceIds: Array.from(selectedServiceIds), notes,
+    };
+    if (isDraftEmpty(draft)) { clearAppointmentDraft(clinicId, authStaff.id); return; }
+    writeAppointmentDraft(clinicId, authStaff.id, draft);
+  }, [
+    draftReady, clinicId, authStaff, step, selectedBranch, selectedDate, selectedDoctor,
+    selectedSlot, manualTimes, isWalkIn, lookupMethod, lookupValue, consentPhase,
+    pendingUserId, foundIdentifier, approvedUser, selectedPetId, walkInName, walkInPhone,
+    selectedServiceIds, notes,
+  ]);
 
   // Poll every 3 s while waiting for owner to approve a data-share request.
   // Fallback for staff without a live Pusher connection — see useClinicPusher subscription below,
@@ -276,8 +349,11 @@ export default function CreateAppointment() {
         phoneNumber: lookupMethod === 'phone' ? value : undefined,
       });
       if (!res.found) {
+        // Surface the "no account found" message and let staff choose — don't
+        // silently flip to walk-in, since that hid the message entirely (it only
+        // ever rendered inside the `!isWalkIn` block) and booked walk-in appointments
+        // for patients who may have just mistyped their code/phone.
         setConsentPhase('not_found');
-        setIsWalkIn(true);
         if (lookupMethod === 'phone') setWalkInPhone(value);
       } else {
         setPendingUserId(res.userId);
@@ -384,6 +460,62 @@ export default function CreateAppointment() {
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
   }
 
+  function handleResumeDraft() {
+    if (!pendingDraft || !clinicId) return;
+    setIsRestoringDraft(true);
+    setStep(pendingDraft.step);
+    setSelectedBranch(pendingDraft.selectedBranch);
+    setSelectedDate(pendingDraft.selectedDate);
+    setSelectedDoctor(pendingDraft.selectedDoctor);
+    setSelectedSlot(pendingDraft.selectedSlot);
+    setManualTimes(pendingDraft.manualTimes);
+    setIsWalkIn(pendingDraft.isWalkIn);
+    setLookupMethod(pendingDraft.lookupMethod);
+    setLookupValue(pendingDraft.lookupValue);
+    setWalkInName(pendingDraft.walkInName);
+    setWalkInPhone(pendingDraft.walkInPhone);
+    setSelectedServiceIds(new Set(pendingDraft.selectedServiceIds));
+    setNotes(pendingDraft.notes);
+    setPendingUserId(pendingDraft.pendingUserId);
+    setFoundIdentifier(pendingDraft.foundIdentifier);
+    setConsentPhase(pendingDraft.consentPhase);
+    setApprovedUser(pendingDraft.approvedUser);
+    setSelectedPetId(pendingDraft.selectedPetId);
+
+    // Re-validate rather than trust stale consent — it may have been revoked, or the
+    // pet list changed, since the draft was saved.
+    if (
+      !pendingDraft.isWalkIn && pendingDraft.pendingUserId &&
+      (pendingDraft.consentPhase === 'approved' || pendingDraft.consentPhase === 'pending')
+    ) {
+      clinicUserSearchService.lookup({ clinicId, userId: pendingDraft.pendingUserId })
+        .then((res) => {
+          if (res.found && res.consentStatus === 'approved') {
+            setApprovedUser(res);
+            setConsentPhase('approved');
+            if (!res.pets?.some((p) => p.id === pendingDraft.selectedPetId)) setSelectedPetId(null);
+          } else if (res.found && res.consentStatus === 'pending') {
+            setConsentPhase('pending');
+          } else {
+            setConsentPhase('none');
+            setApprovedUser(null);
+            setSelectedPetId(null);
+            setShareRequestError('This patient’s consent status changed since you started this booking — please check again.');
+          }
+        })
+        .catch(() => {}); // keep the optimistically-restored state if the re-check itself fails
+    }
+
+    setPendingDraft(null);
+    setDraftReady(true);
+  }
+
+  function handleDiscardDraft() {
+    if (clinicId && authStaff) clearAppointmentDraft(clinicId, authStaff.id);
+    setPendingDraft(null);
+    setDraftReady(true);
+  }
+
   function toggleService(id: number) {
     setSelectedServiceIds((p) => {
       const n = new Set(p);
@@ -436,6 +568,7 @@ export default function CreateAppointment() {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         notes: notes.trim() || undefined,
       });
+      if (clinicId && authStaff) clearAppointmentDraft(clinicId, authStaff.id);
       navigate(`/appointments/${appt.id}`, { state: { successMsg: 'Appointment booked.' } });
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Failed to create appointment.');
@@ -474,10 +607,38 @@ export default function CreateAppointment() {
             <h1 className={styles.pageTitle}>New Appointment</h1>
             <p className={styles.pageSubtitle}>Book an appointment in {STEP_LABELS.length} steps.</p>
           </div>
-          <Button variant="outline" icon="bi-arrow-left" onClick={() => navigate('/appointments')} disabled={saving}>
+          <Button
+            variant="outline"
+            icon="bi-arrow-left"
+            onClick={() => {
+              if (isDraftEmpty({ step, selectedBranch, selectedDate, isWalkIn, lookupValue })) {
+                navigate('/appointments');
+              } else {
+                setShowDiscardConfirm(true);
+              }
+            }}
+            disabled={saving}
+          >
             Cancel
           </Button>
         </div>
+
+        {pendingDraft && (
+          <div
+            className={`alert alert-info py-2 ${styles.feedbackAlert}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}
+          >
+            <span>
+              <i className="bi bi-info-circle" /> You have an appointment in progress from{' '}
+              {pendingDraftMinutesAgo} min ago
+              {' '}(Step {pendingDraft.step}: {STEP_LABELS[pendingDraft.step - 1]}).
+            </span>
+            <span style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+              <Button variant="outline" size="small" onClick={handleDiscardDraft}>Start Over</Button>
+              <Button variant="primary" size="small" onClick={handleResumeDraft}>Resume</Button>
+            </span>
+          </div>
+        )}
 
         {/* Stepper */}
         <div className={styles.stepper}>
@@ -978,7 +1139,14 @@ export default function CreateAppointment() {
           <Button
             variant="outline"
             icon="bi-arrow-left"
-            onClick={() => step > 1 ? setStep((p) => (p - 1) as Step) : navigate('/appointments')}
+            onClick={() => {
+              if (step > 1) { setStep((p) => (p - 1) as Step); return; }
+              if (isDraftEmpty({ step, selectedBranch, selectedDate, isWalkIn, lookupValue })) {
+                navigate('/appointments');
+              } else {
+                setShowDiscardConfirm(true);
+              }
+            }}
             disabled={saving}
           >
             {step === 1 ? 'Cancel' : 'Back'}
@@ -995,6 +1163,31 @@ export default function CreateAppointment() {
         </div>
 
       </div>
+
+      <Modal
+        isOpen={showDiscardConfirm}
+        onClose={() => setShowDiscardConfirm(false)}
+        title="Discard this appointment?"
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => setShowDiscardConfirm(false)}>
+              Keep editing
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                handleDiscardDraft();
+                setShowDiscardConfirm(false);
+                navigate('/appointments');
+              }}
+            >
+              Discard
+            </Button>
+          </>
+        )}
+      >
+        <p style={{ margin: 0 }}>Your progress on this appointment will be lost.</p>
+      </Modal>
     </>
   );
 }

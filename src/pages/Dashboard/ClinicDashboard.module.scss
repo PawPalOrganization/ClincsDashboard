@@ -100,12 +100,26 @@
 // ─── Stats grid ───────────────────────────────────────────────────────────────
 
 .statsGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  // Flexbox, not grid: with a variable card count (3 fixed stat cards + up to 2
+  // permission-gated meter/split-bar cards), a fixed grid column count leaves a
+  // gap when the last row doesn't divide evenly (e.g. 5 cards / 3 columns = a
+  // trailing row of 2 with an empty slot). The basis is exactly a third of the
+  // row (minus its share of the two gaps between 3 cards), which is what caps
+  // it at 3 per row — a 4th card's basis can't fit in the remaining space, so
+  // it wraps. flex-grow then lets a shorter last row's cards expand to fill
+  // whatever width that row actually has, however many cards it holds.
+  display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
 
+  > * {
+    flex: 1 1 calc((100% - 2rem) / 3);
+  }
+
   @media (max-width: 768px) {
-    grid-template-columns: minmax(0, 1fr);
+    > * {
+      flex: 1 1 100%;
+    }
   }
 }
 
