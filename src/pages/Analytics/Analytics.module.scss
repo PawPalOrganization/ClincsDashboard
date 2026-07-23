@@ -1,0 +1,239 @@
+// Analytics dashboard — reuses the same design tokens as the rest of the portal
+
+.page {
+  padding: 1.5rem 1.75rem;
+  max-width: 1200px;
+
+  @media (max-width: 700px) {
+    padding: 1rem;
+  }
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1a1d2e;
+  margin: 0 0 0.2rem;
+}
+
+.pageSubtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.feedbackAlert {
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+}
+
+// ─── Date range filter ─────────────────────────────────────────────────────────
+
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dateInput {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--color-primary, #0d9aff);
+  }
+}
+
+.dateRangeSep {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.clearRangeBtn {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #6b7280;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+
+  &:hover { border-color: #9ca3af; color: #374151; }
+  &:disabled { cursor: not-allowed; opacity: 0.5; }
+}
+
+.dateRangeHint {
+  font-size: 0.8rem;
+  color: #b45309;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+// ─── Section ────────────────────────────────────────────────────────────────────
+
+.section {
+  margin-bottom: 1.75rem;
+}
+
+.sectionTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0 0 0.875rem;
+}
+
+// ─── Stats grid ───────────────────────────────────────────────────────────────
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 480px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+// ─── Cards (chart / table wrappers) ────────────────────────────────────────────
+
+.card {
+  border: 1px solid #e4e7ec;
+  border-radius: 0.875rem;
+  background: #fff;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+// Loading placeholder for a stat/meter/split-bar card — centered like the real thing
+.statSkeletonCard {
+  background: #ffffff;
+  border: 1px solid #f0f0f0;
+  border-radius: 0.875rem;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.cardTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.cardMeta {
+  font-size: 0.775rem;
+  color: #9ba3af;
+}
+
+.chartEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: #9ca3af;
+  text-align: center;
+
+  i { font-size: 2rem; color: #d1d5db; }
+  p { margin: 0; font-size: 0.875rem; }
+}
+
+// ─── Sortable column header (mirrors Appointments.module.scss) ─────────────────
+
+.sortToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s;
+
+  i { font-size: 0.8rem; color: var(--color-primary, #0d9aff); }
+
+  &:hover { color: var(--color-primary, #0d9aff); }
+}
+
+// ─── Cell helpers (mirrors Appointments.module.scss) ────────────────────────────
+
+.cellText {
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.costCell {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.serviceNameCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+
+  span { font-size: 0.875rem; color: #111827; font-weight: 500; }
+  small { font-size: 0.75rem; color: #9ca3af; }
+}
+
+.noData {
+  color: #d1d5db;
+  font-size: 0.875rem;
+}
+
+// ─── Access / error / empty states ───────────────────────────────────────────
+
+.noClinic,
+.accessDenied {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  gap: 0.75rem;
+  color: #6b7280;
+
+  i { font-size: 2.5rem; color: #d1d5db; }
+  h2 { font-size: 1.1rem; font-weight: 700; color: #374151; margin: 0; }
+  p { margin: 0; font-size: 0.9rem; }
+}

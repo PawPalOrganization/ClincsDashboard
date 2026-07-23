@@ -180,13 +180,7 @@
   margin: 0.25rem 0 0;
 }
 
-// ─── Quick actions grid ───────────────────────────────────────────────────────
-
-.actionsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-}
+// ─── Action / teaser card ─────────────────────────────────────────────────────
 
 .actionCard {
   display: flex;

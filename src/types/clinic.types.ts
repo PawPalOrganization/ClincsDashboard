@@ -627,3 +627,91 @@ export interface ReviewDeletedEvent {
   id: string | number;
   clinicBranchId?: number;
 }
+
+// ─── Dashboard Analytics ───────────────────────────────────────────────────────
+// Read-only. startDate/endDate are YYYY-MM-DD (UTC calendar days) — send both or
+// neither (a single date is rejected by the backend with 400).
+
+export interface DashboardDateRangeParams {
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface DashboardPeriod {
+  startDate: string;
+  endDate: string;
+}
+
+export interface AppointmentSourceSplit {
+  app: number;
+  manual: number;
+  appPercent: number;
+  manualPercent: number;
+}
+
+export interface ClientComposition {
+  new: number;
+  returning: number;
+  newPercent: number;
+  returningPercent: number;
+}
+
+// GET /clinic/api/clinics/:clinicId/dashboard/kpis?startDate=&endDate=
+// Defaults when no dates given: all-time (period: null), except branches/staffMembers/
+// appointmentsToday which are always current/UTC-today regardless of the date filter.
+export interface DashboardKpis {
+  branches: number;
+  staffMembers: number;
+  appointmentsToday: number;
+  noShowRate: number;
+  noShowRateDelta: number | null; // vs previous equal-length period; null when period is all-time
+  totalAppointments: number;
+  appointmentSources: AppointmentSourceSplit;
+  clientComposition: ClientComposition;
+  period: DashboardPeriod | null; // null = all-time
+}
+
+export type DashboardGrain = 'daily' | 'monthly';
+
+export interface RevenueByBranch {
+  clinicBranchId: number;
+  branchTitle: string;
+  revenue: number;
+}
+
+export interface RevenuePoint {
+  bucket: string; // '2026-07-19' (daily grain) or '2026-07' (monthly grain)
+  revenue: number;
+  byBranch: RevenueByBranch[];
+}
+
+// GET /clinic/api/clinics/:clinicId/dashboard/revenue?startDate=&endDate=
+// Default range when no dates given: 1st of current month → today. grain is
+// backend-decided (daily for <=30 day ranges, monthly otherwise) — never sent by the client.
+export interface DashboardRevenue {
+  period: DashboardPeriod;
+  grain: DashboardGrain;
+  points: RevenuePoint[];
+}
+
+// GET /clinic/api/clinics/:clinicId/dashboard/services?sortBy=&sortOrder=&startDate=&endDate=
+// Same default range as revenue. Only services with profit > 0 are included; bookings
+// counts distinct finished appointments. No pagination — backend returns the full list.
+export interface DashboardServiceListParams extends DashboardDateRangeParams {
+  sortBy?: 'bookings' | 'profit';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface DashboardServiceItem {
+  clinicServiceId: number;
+  name: string;
+  nameAr: string;
+  profit: number;
+  bookings: number;
+}
+
+export interface DashboardServices {
+  period: DashboardPeriod;
+  grain: DashboardGrain;
+  items: DashboardServiceItem[];
+}

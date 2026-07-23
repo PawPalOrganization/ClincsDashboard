@@ -11,6 +11,7 @@ import Login from './pages/Login/Login';
 
 // Lazy page chunks — each becomes its own JS file, loaded only when navigated to
 const ClinicDashboard    = lazy(() => import('./pages/Dashboard/ClinicDashboard'));
+const AnalyticsDashboard = lazy(() => import('./pages/Analytics/AnalyticsDashboard'));
 const ClinicSettings     = lazy(() => import('./pages/Settings/ClinicSettings'));
 const BranchesList       = lazy(() => import('./pages/Branches/BranchesList'));
 const CreateBranch       = lazy(() => import('./pages/Branches/CreateBranch'));
@@ -105,6 +106,7 @@ export default function App() {
               {/* Suspense wrapper — shows PawLoader while any lazy page chunk loads */}
               <Route element={<Suspense fallback={<PawLoader size="large" overlay />}><Outlet /></Suspense>}>
                 <Route path="/dashboard"           element={<ClinicDashboard />} />
+                <Route path="/analytics"           element={<AnalyticsDashboard />} />
                 <Route path="/branches"            element={<BranchesList />} />
                 <Route path="/branches/create"     element={<CreateBranch />} />
                 <Route path="/branches/:branchId"  element={<EditBranch />} />

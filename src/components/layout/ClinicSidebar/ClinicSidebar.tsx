@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useClinicAuth } from '../../../context/ClinicAuthContext';
-import { hasClinicPermission } from '../../../utils/clinicPermissions';
+import { hasAnyClinicPermission, hasClinicPermission } from '../../../utils/clinicPermissions';
 import type { ClinicPermissionSlug } from '../../../utils/clinicPermissions';
 import clinicProfileService from '../../../services/clinic/clinicProfileService';
 import clinicNotificationService from '../../../services/clinic/clinicNotificationService';
@@ -21,11 +21,12 @@ interface NavItem {
   path: string;
   icon: string;
   label: string;
-  permission?: ClinicPermissionSlug;
+  permission?: ClinicPermissionSlug | ClinicPermissionSlug[];
 }
 
 const NAV_ITEMS: NavItem[] = [
   { path: '/dashboard',    icon: 'bi-grid',              label: 'Dashboard'    },
+  { path: '/analytics',    icon: 'bi-graph-up',          label: 'Analytics',    permission: ['dashboard.overview.read', 'dashboard.finance.read'] },
   { path: '/branches',     icon: 'bi-building',          label: 'Branches',     permission: 'clinic-branches.read'  },
   { path: '/appointments', icon: 'bi-calendar-check',    label: 'Appointments', permission: 'appointments.read'     },
   { path: '/patients',     icon: 'bi-person-lines-fill', label: 'Patients',     permission: 'users.read'            },
@@ -158,9 +159,12 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
     return '/appointments';
   }
 
-  const visibleNavItems = NAV_ITEMS.filter(
-    (item) => !item.permission || hasClinicPermission(staff, item.permission),
-  );
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (!item.permission) return true;
+    return Array.isArray(item.permission)
+      ? hasAnyClinicPermission(staff, item.permission)
+      : hasClinicPermission(staff, item.permission);
+  });
   const navigate = useNavigate();
 
   const staffName =

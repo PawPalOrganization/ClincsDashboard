@@ -22,6 +22,8 @@ interface DataTableProps<T extends DataRow> {
   currentPage: number;
   totalPages: number;
   totalItems: number;
+  /** Rows per page, used only for the "Showing X to Y of Z" footer caption. Defaults to 10. */
+  pageSize?: number;
   onPageChange: (page: number) => void;
   onEdit?: (row: T) => void;
   onDelete?: (row: T) => void;
@@ -35,6 +37,7 @@ function DataTableInner<T extends DataRow>({
   currentPage,
   totalPages,
   totalItems,
+  pageSize = 10,
   onPageChange,
   onEdit,
   onDelete,
@@ -201,8 +204,8 @@ function DataTableInner<T extends DataRow>({
 
       <div className={styles.tableFooter}>
         <div className={styles.itemsInfo}>
-          Showing {(currentPage - 1) * 10 + 1} to{' '}
-          {Math.min(currentPage * 10, totalItems)} of {totalItems} items
+          Showing {(currentPage - 1) * pageSize + 1} to{' '}
+          {Math.min(currentPage * pageSize, totalItems)} of {totalItems} items
         </div>
         {renderPagination()}
       </div>

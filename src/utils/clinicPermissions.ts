@@ -28,7 +28,9 @@ export type ClinicPermissionSlug =
   | 'users.search'
   | 'users.share-request'
   | 'users.read'
-  | 'reviews.read';
+  | 'reviews.read'
+  | 'dashboard.overview.read'
+  | 'dashboard.finance.read';
 
 const PRIVILEGED_ROLE_WORDS = ['owner'];
 

@@ -1,18 +1,25 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicApi from '../../services/clinic/clinicApi';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
-import { hasClinicPermission } from '../../utils/clinicPermissions';
+import clinicDashboardService from '../../services/clinic/clinicDashboardService';
+import { hasAnyClinicPermission, hasClinicPermission } from '../../utils/clinicPermissions';
 import type {
   ApiResponse,
   Appointment,
   Clinic,
   ClinicStaff,
+  DashboardKpis,
   PaginatedList,
 } from '../../types/clinic.types';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
+import StatCard from '../../components/common/StatCard/StatCard';
+import Meter from '../../components/common/Meter/Meter';
+import SplitBar from '../../components/common/SplitBar/SplitBar';
 import styles from './ClinicDashboard.module.scss';
+
+const NEUTRAL = '#cbd5e1';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -80,22 +87,6 @@ function DashboardSkeleton() {
         ))}
       </div>
 
-      {/* action cards */}
-      <Skeleton width="120px" height="16px" />
-      <div className={styles.actionsGrid}>
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={styles.actionCard} style={{ pointerEvents: 'none' }}>
-            <Skeleton variant="rectangular" width="48px" height="48px" />
-            <div className={styles.actionBody}>
-              <Skeleton width="130px" height="16px" />
-              <div style={{ marginTop: '6px' }}>
-                <Skeleton width="170px" height="12px" />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* bookings skeleton */}
       <Skeleton width="150px" height="16px" />
       <div className={styles.staffCard}>
@@ -128,38 +119,6 @@ function NoClinic() {
   );
 }
 
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-
-interface StatCardProps {
-  icon: string;
-  iconBg: string;
-  iconColor: string;
-  value: number;
-  label: string;
-  error?: string;
-  emptyLabel?: string;
-}
-
-const StatCard = memo(function StatCard({
-  icon, iconBg, iconColor, value, label, error, emptyLabel,
-}: StatCardProps) {
-  return (
-    <div className={styles.statCard}>
-      <div className={styles.statIcon} style={{ background: iconBg, color: iconColor }}>
-        <i className={`bi ${icon}`} />
-      </div>
-      {error ? (
-        <div className={styles.statNoData}>No data to display</div>
-      ) : value === 0 ? (
-        <div className={styles.statNoData}>{emptyLabel ?? 'No data yet'}</div>
-      ) : (
-        <div className={styles.statNumber}>{value}</div>
-      )}
-      <div className={styles.statLabel}>{label}</div>
-    </div>
-  );
-});
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ClinicDashboard() {
@@ -169,6 +128,8 @@ export default function ClinicDashboard() {
   const canViewBranches      = hasClinicPermission(authStaff, 'clinic-branches.read');
   const canViewStaff         = hasClinicPermission(authStaff, 'clinic-staff.read');
   const canViewAppointments  = hasClinicPermission(authStaff, 'appointments.read');
+  const canViewOverviewKpis  = hasClinicPermission(authStaff, 'dashboard.overview.read');
+  const canViewAnalytics     = hasAnyClinicPermission(authStaff, ['dashboard.overview.read', 'dashboard.finance.read']);
 
   const [loadingStats, setLoadingStats]           = useState(true);
   const [loadingBookings, setLoadingBookings]     = useState(true);
@@ -177,11 +138,13 @@ export default function ClinicDashboard() {
   const [totalStaff, setTotalStaff]               = useState(0);
   const [todayBookings, setTodayBookings]         = useState<Appointment[]>([]);
   const [totalTodayBookings, setTotalTodayBookings] = useState(0);
+  const [kpis, setKpis]                           = useState<DashboardKpis | null>(null);
   const [errors, setErrors]                       = useState<{
     clinic?: string;
     branches?: string;
     staff?: string;
     appointments?: string;
+    kpis?: string;
   }>({});
 
   const staffFirstName = authStaff?.firstName ?? 'Staff';
@@ -192,12 +155,13 @@ export default function ClinicDashboard() {
     const SKIP  = Promise.resolve(null);
     const today = new Date().toISOString().split('T')[0];
 
-    // ── Stats (clinic + branches + staff) — shown as soon as these three resolve ──
+    // ── Stats (clinic + branches + staff + KPIs) — shown as soon as these resolve ──
     Promise.allSettled([
-      canViewClinic   ? clinicApi.get<ApiResponse<Clinic>>(`/clinics/${clinicId}`) : SKIP,
-      canViewBranches ? clinicApi.get<ApiResponse<{ items: unknown[]; meta: { total: number } } | unknown[]>>(`/clinics/${clinicId}/branches`) : SKIP,
-      canViewStaff    ? clinicApi.get<{ data: { meta?: { total: number }; items?: ClinicStaff[] } | ClinicStaff[] }>('/clinic-staff', { page: 1, limit: 1 }) : SKIP,
-    ]).then(([clinicRes, branchesRes, staffRes]) => {
+      canViewClinic      ? clinicApi.get<ApiResponse<Clinic>>(`/clinics/${clinicId}`) : SKIP,
+      canViewBranches    ? clinicApi.get<ApiResponse<{ items: unknown[]; meta: { total: number } } | unknown[]>>(`/clinics/${clinicId}/branches`) : SKIP,
+      canViewStaff       ? clinicApi.get<{ data: { meta?: { total: number }; items?: ClinicStaff[] } | ClinicStaff[] }>('/clinic-staff', { page: 1, limit: 1 }) : SKIP,
+      canViewOverviewKpis ? clinicDashboardService.getKpis(clinicId) : SKIP,
+    ]).then(([clinicRes, branchesRes, staffRes, kpisRes]) => {
       const nextErrors: typeof errors = {};
 
       if (canViewClinic) {
@@ -228,6 +192,14 @@ export default function ClinicDashboard() {
         }
       }
 
+      if (canViewOverviewKpis) {
+        if (kpisRes.status === 'fulfilled' && kpisRes.value) {
+          setKpis(kpisRes.value as DashboardKpis);
+        } else if (kpisRes.status === 'rejected') {
+          nextErrors.kpis = 'Could not load analytics.';
+        }
+      }
+
       setErrors((prev) => ({ ...prev, ...nextErrors }));
       setLoadingStats(false);
     });
@@ -248,43 +220,10 @@ export default function ClinicDashboard() {
       })
       .finally(() => setLoadingBookings(false));
 
-  }, [clinicId, canViewClinic, canViewBranches, canViewStaff, canViewAppointments]);
+  }, [clinicId, canViewClinic, canViewBranches, canViewStaff, canViewAppointments, canViewOverviewKpis]);
 
   if (loadingStats) return <DashboardSkeleton />;
   if (!clinicId) return <NoClinic />;
-
-  const canViewSettings = hasClinicPermission(authStaff, 'clinics.read');
-
-  const quickActions = [
-    canViewAppointments && {
-      to: '/appointments',
-      icon: 'bi-calendar2-check-fill',
-      title: 'Appointments',
-      desc: 'Manage clinic appointments',
-      accent: '#8b5cf6',
-    },
-    canViewBranches && {
-      to: '/branches',
-      icon: 'bi-building',
-      title: 'Manage Branches',
-      desc: 'View and manage clinic branches',
-      accent: '#0d9aff',
-    },
-    canViewStaff && {
-      to: '/staff',
-      icon: 'bi-people-fill',
-      title: 'Manage Staff',
-      desc: 'View and manage clinic staff members',
-      accent: '#10b981',
-    },
-    canViewSettings && {
-      to: '/settings',
-      icon: 'bi-gear-fill',
-      title: 'Clinic Settings',
-      desc: 'Update clinic information and details',
-      accent: '#f59e0b',
-    },
-  ].filter(Boolean) as Array<{ to: string; icon: string; title: string; desc: string; accent: string }>;
 
   return (
     <div className={styles.page}>
@@ -348,24 +287,45 @@ export default function ClinicDashboard() {
             error={errors.appointments}
           />
         )}
+        {canViewOverviewKpis && (
+          <Meter
+            icon="bi-graph-down-arrow"
+            iconBg="rgba(231,76,60,0.10)"
+            iconColor="#e74c3c"
+            value={kpis?.noShowRate ?? 0}
+            label="No-Show Rate"
+            subLabel="All time"
+            error={errors.kpis}
+          />
+        )}
+        {canViewOverviewKpis && (
+          <SplitBar
+            icon="bi-phone"
+            iconBg="rgba(13,154,255,0.10)"
+            iconColor="#0d9aff"
+            label="App vs Manual Bookings"
+            segments={[
+              { label: 'App', percent: kpis?.appointmentSources.appPercent ?? 0, color: '#0d9aff' },
+              { label: 'Manual', percent: kpis?.appointmentSources.manualPercent ?? 0, color: NEUTRAL },
+            ]}
+            error={errors.kpis}
+          />
+        )}
       </div>
 
-      {/* ── Quick actions ── */}
-      <h2 className={styles.sectionTitle}>Quick Actions</h2>
-      <div className={styles.actionsGrid}>
-        {quickActions.map(({ to, icon, title, desc, accent }) => (
-          <Link key={to} to={to} className={styles.actionCard}>
-            <div className={styles.actionIcon} style={{ background: `${accent}1a`, color: accent }}>
-              <i className={`bi ${icon}`} />
-            </div>
-            <div className={styles.actionBody}>
-              <div className={styles.actionTitle}>{title}</div>
-              <div className={styles.actionDesc}>{desc}</div>
-            </div>
-            <i className={`bi bi-chevron-right ${styles.actionChevron}`} />
-          </Link>
-        ))}
-      </div>
+      {/* ── Analytics teaser ── */}
+      {canViewAnalytics && (
+        <Link to="/analytics" className={styles.actionCard}>
+          <div className={styles.actionIcon} style={{ background: 'rgba(13,154,255,0.10)', color: '#0d9aff' }}>
+            <i className="bi bi-graph-up" />
+          </div>
+          <div className={styles.actionBody}>
+            <div className={styles.actionTitle}>View Full Analytics</div>
+            <div className={styles.actionDesc}>Revenue, KPIs, and top services</div>
+          </div>
+          <i className={`bi bi-chevron-right ${styles.actionChevron}`} />
+        </Link>
+      )}
 
       {/* ── Today's bookings ── */}
       {canViewAppointments && (
