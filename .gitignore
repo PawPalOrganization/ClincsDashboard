@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Environment variables — never commit secrets/per-environment config
+.env
+.env.local
+.env.*.local
+
+# Internal engineering notes — audit findings and progress logs don't belong in the
+# shipped repo. SECURITY_PERFORMANCE_REPORT.md and REMAINING_FIXES.md in particular
+# document specific known vulnerabilities; keep them out of version control entirely.
+PROGRESS.md
+SECURITY_PERFORMANCE_REPORT.md
+SESSION_REPORT.md
+REMAINING_FIXES.md
+PawClinics_Project_Report.html
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
