@@ -30,16 +30,23 @@
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.3s ease;
+  animation: modalPopIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes slideIn {
+/* A gentle rise + scale with a slight overshoot (the 60% step) instead of a
+   flat fade/slide — reads as the modal settling into place rather than just
+   appearing. */
+@keyframes modalPopIn {
   from {
-    transform: translateY(-20px);
+    transform: translateY(28px) scale(0.94);
     opacity: 0;
   }
+  60% {
+    transform: translateY(-3px) scale(1.015);
+    opacity: 1;
+  }
   to {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }

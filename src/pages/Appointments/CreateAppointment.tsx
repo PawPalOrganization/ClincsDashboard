@@ -5,6 +5,8 @@ import { useClinicPusher } from '../../hooks/useClinicPusher';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import clinicCatalogService from '../../services/clinic/clinicCatalogService';
+import clinicClientsService from '../../services/clinic/clinicClientsService';
+import clinicPetTypesService from '../../services/clinic/clinicPetTypesService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
 import clinicUserSearchService from '../../services/clinic/clinicUserSearchService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
@@ -21,6 +23,7 @@ import type {
   ClinicService,
   ClinicStaff,
   PetSummary,
+  PetType,
 } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import PawLoader from '../../components/common/PawLoader/PawLoader';
@@ -104,6 +107,10 @@ export default function CreateAppointment() {
   const { clinicId, staff: authStaff, token, branchId: authBranchId } = useClinicAuth();
   const navigate = useNavigate();
   const canCreate = hasClinicPermission(authStaff, 'appointments.create');
+  // Both permissions are required — a new client isn't bookable without a pet, so
+  // there's no point exposing the entry point with only one of the two.
+  const canCreateClient =
+    hasClinicPermission(authStaff, 'users.create') && hasClinicPermission(authStaff, 'pets.create');
 
   const [step, setStep] = useState<Step>(1);
   const [saving, setSaving] = useState(false);
@@ -125,7 +132,6 @@ export default function CreateAppointment() {
   // Step 3 — consent-aware patient lookup
   type ConsentPhase = 'idle' | 'searching' | 'not_found' | 'none' | 'pending' | 'approved';
   type LookupMethod = 'code' | 'phone';
-  const [isWalkIn, setIsWalkIn] = useState(false);
   const [lookupMethod, setLookupMethod] = useState<LookupMethod>('code');
   const [lookupValue, setLookupValue] = useState('');
   const [lookupFormatError, setLookupFormatError] = useState('');
@@ -143,9 +149,30 @@ export default function CreateAppointment() {
   const [shareRequestLoading, setShareRequestLoading] = useState(false);
   const [additionalPetShareLoading, setAdditionalPetShareLoading] = useState(false);
   const [additionalPetShareMessage, setAdditionalPetShareMessage] = useState('');
-  const [walkInName, setWalkInName] = useState('');
-  const [walkInPhone, setWalkInPhone] = useState('');
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Step 3 — "New client" onboarding (unclaimed user, walk-ins not yet on the app).
+  // Resolves into the same approvedUser/selectedPetId/consentPhase state the
+  // search-and-consent path above produces, so nothing downstream needs to know
+  // this patient came from here instead of a lookup.
+  type NewClientPhase = 'idle' | 'user_form' | 'pet_step' | 'pet_form';
+  const [newClientPhase, setNewClientPhase] = useState<NewClientPhase>('idle');
+  const [newClientSaving, setNewClientSaving] = useState(false);
+  const [newClientError, setNewClientError] = useState('');
+  const [newClientFieldErrors, setNewClientFieldErrors] = useState<{ email?: string }>({});
+  const [newFirstName, setNewFirstName] = useState('');
+  const [newLastName, setNewLastName] = useState('');
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPetName, setNewPetName] = useState('');
+  const [newPetTypeId, setNewPetTypeId] = useState('');
+  const [newClientUserId, setNewClientUserId] = useState<number | null>(null);
+  // Pre-existing pets on file if the phone number matched an already-created
+  // unclaimed record (e.g. a returning off-app client from a prior walk-in visit).
+  const [newClientPets, setNewClientPets] = useState<PetSummary[]>([]);
+  const [petTypes, setPetTypes] = useState<PetType[]>([]);
+  const [petTypesLoading, setPetTypesLoading] = useState(false);
+  const [petTypesError, setPetTypesError] = useState('');
 
   const USER_HASH_RE = /^[a-z]+-[a-z]+-[a-z0-9]{4}$/;
 
@@ -255,16 +282,16 @@ export default function CreateAppointment() {
     const draft: AppointmentDraft = {
       savedAt: Date.now(),
       step, selectedBranch, selectedDate, selectedDoctor, selectedSlot, manualTimes,
-      isWalkIn, lookupMethod, lookupValue, consentPhase, pendingUserId, foundIdentifier,
-      approvedUser, selectedPetId, walkInName, walkInPhone,
+      lookupMethod, lookupValue, consentPhase, pendingUserId, foundIdentifier,
+      approvedUser, selectedPetId,
       selectedServiceIds: Array.from(selectedServiceIds), notes,
     };
     if (isDraftEmpty(draft)) { clearAppointmentDraft(clinicId, authStaff.id); return; }
     writeAppointmentDraft(clinicId, authStaff.id, draft);
   }, [
     draftReady, clinicId, authStaff, step, selectedBranch, selectedDate, selectedDoctor,
-    selectedSlot, manualTimes, isWalkIn, lookupMethod, lookupValue, consentPhase,
-    pendingUserId, foundIdentifier, approvedUser, selectedPetId, walkInName, walkInPhone,
+    selectedSlot, manualTimes, lookupMethod, lookupValue, consentPhase,
+    pendingUserId, foundIdentifier, approvedUser, selectedPetId,
     selectedServiceIds, notes,
   ]);
 
@@ -313,6 +340,19 @@ export default function CreateAppointment() {
     },
   });
 
+  // Lazily load the pet-type dropdown options the first time the "add pet" form
+  // for a new client is opened — no need to fetch this on every page load.
+  useEffect(() => {
+    if (newClientPhase !== 'pet_form' || petTypes.length > 0 || petTypesLoading) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-demand pattern, same as the branch/doctors effect above
+    setPetTypesLoading(true);
+    setPetTypesError('');
+    clinicPetTypesService.listPetTypes()
+      .then(setPetTypes)
+      .catch(() => setPetTypesError('Failed to load pet types. Check your connection and try again.'))
+      .finally(() => setPetTypesLoading(false));
+  }, [newClientPhase, petTypes.length, petTypesLoading]);
+
   // ─── Actions ────────────────────────────────────────────────────────────────
 
   function pickSlot(doctorId: string, slot: string) {
@@ -349,12 +389,9 @@ export default function CreateAppointment() {
         phoneNumber: lookupMethod === 'phone' ? value : undefined,
       });
       if (!res.found) {
-        // Surface the "no account found" message and let staff choose — don't
-        // silently flip to walk-in, since that hid the message entirely (it only
-        // ever rendered inside the `!isWalkIn` block) and booked walk-in appointments
-        // for patients who may have just mistyped their code/phone.
+        // Surface the "no account found" message and let staff choose what to do
+        // next (retry, or register them as a new walk-in client) rather than guessing.
         setConsentPhase('not_found');
-        if (lookupMethod === 'phone') setWalkInPhone(value);
       } else {
         setPendingUserId(res.userId);
         setFoundIdentifier({ type: lookupMethod === 'code' ? 'userHash' : 'phoneNumber', value });
@@ -457,7 +494,135 @@ export default function CreateAppointment() {
     setSelectedPetId(null);
     setShareRequestError('');
     setAdditionalPetShareMessage('');
+    resetNewClientFields();
     if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
+  }
+
+  function resetNewClientFields() {
+    setNewClientPhase('idle');
+    setNewClientSaving(false);
+    setNewClientError('');
+    setNewClientFieldErrors({});
+    setNewFirstName('');
+    setNewLastName('');
+    setNewPhoneNumber('');
+    setNewEmail('');
+    setNewPetName('');
+    setNewPetTypeId('');
+    setNewClientUserId(null);
+    setNewClientPets([]);
+  }
+
+  async function handleCreateClientUser() {
+    if (!clinicId) return;
+    if (!newFirstName.trim() || !newLastName.trim() || !newPhoneNumber.trim()) {
+      setNewClientError('First name, last name, and phone number are required.');
+      return;
+    }
+    setNewClientSaving(true);
+    setNewClientError('');
+    setNewClientFieldErrors({});
+    try {
+      const user = await clinicClientsService.createUser(clinicId, {
+        firstName: newFirstName.trim(),
+        lastName: newLastName.trim(),
+        phoneNumber: newPhoneNumber.trim(),
+        email: newEmail.trim() || undefined,
+      });
+      setNewClientUserId(user.id);
+      // The phone may have matched an already-created unclaimed record (backend
+      // reuses it rather than erroring) — re-check via the existing lookup to pick
+      // up any pets already on file from a prior walk-in visit.
+      try {
+        const profile = await clinicUserSearchService.lookup({ clinicId, userId: user.id });
+        setNewClientPets(profile.found && profile.consentStatus === 'approved' ? profile.pets : []);
+      } catch {
+        setNewClientPets([]);
+      }
+      setNewClientPhase('pet_step');
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      const message = err instanceof Error ? err.message : 'Failed to create client.';
+      if (status === 409 && /claimed/i.test(message)) {
+        setNewClientError('This phone number belongs to a registered app user. Use Lookup by Code or Phone instead.');
+      } else if (status === 409 && /email/i.test(message)) {
+        setNewClientFieldErrors({ email: 'This email is already in use by another account.' });
+      } else {
+        setNewClientError(message);
+      }
+    } finally {
+      setNewClientSaving(false);
+    }
+  }
+
+  // Finalizes either an existing pet (picked from newClientPets) or a freshly
+  // created one into the same approvedUser/selectedPetId/consentPhase state the
+  // search-and-consent path produces — everything downstream (validation, submit
+  // payload, step-4 summary, draft persistence) treats this identically.
+  function finalizeNewClient(pet: PetSummary) {
+    setApprovedUser({
+      userId: newClientUserId!,
+      firstName: newFirstName.trim(),
+      lastName: newLastName.trim(),
+      phoneNumber: newPhoneNumber.trim(),
+      pets: newClientPets.some((p) => p.id === pet.id) ? newClientPets : [...newClientPets, pet],
+    });
+    setSelectedPetId(pet.id);
+    setConsentPhase('approved');
+    resetNewClientFields();
+  }
+
+  async function handleCreateClientPet() {
+    if (!clinicId || newClientUserId == null) return;
+    if (!newPetName.trim() || !newPetTypeId) {
+      setNewClientError('Pet name and type are required.');
+      return;
+    }
+    setNewClientSaving(true);
+    setNewClientError('');
+    try {
+      const pet = await clinicClientsService.createPet(clinicId, newClientUserId, {
+        name: newPetName.trim(),
+        petTypeId: Number(newPetTypeId),
+      });
+      finalizeNewClient(pet);
+    } catch (err) {
+      setNewClientError(err instanceof Error ? err.message : 'Failed to create pet.');
+    } finally {
+      setNewClientSaving(false);
+    }
+  }
+
+  function petCard(pet: PetSummary, selected: boolean, onClick: () => void) {
+    return (
+      <button
+        key={pet.id}
+        type="button"
+        onClick={onClick}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.6rem',
+          padding: '0.65rem 0.875rem',
+          border: selected ? '2px solid var(--color-primary, #0d9aff)' : '1.5px solid #e4e7ec',
+          borderRadius: '0.625rem',
+          background: selected ? 'rgba(13,154,255,0.05)' : '#fff',
+          cursor: 'pointer', textAlign: 'left', width: '100%',
+          transition: 'border-color 0.12s, background 0.12s',
+          boxShadow: selected ? '0 0 0 3px rgba(13,154,255,0.1)' : 'none',
+        }}
+      >
+        {pet.imageUrl ? (
+          <img src={pet.imageUrl} alt={pet.name} style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(13,154,255,0.1)', color: 'var(--color-primary, #0d9aff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>
+            <i className="bi bi-heart-fill" />
+          </div>
+        )}
+        <span style={{ fontSize: '0.875rem', fontWeight: selected ? 600 : 500, color: selected ? 'var(--color-primary, #0d9aff)' : '#111827', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {pet.name}
+        </span>
+        {selected && <i className="bi bi-check-circle-fill" style={{ color: 'var(--color-primary, #0d9aff)', flexShrink: 0, fontSize: '0.875rem' }} />}
+      </button>
+    );
   }
 
   function handleResumeDraft() {
@@ -469,11 +634,8 @@ export default function CreateAppointment() {
     setSelectedDoctor(pendingDraft.selectedDoctor);
     setSelectedSlot(pendingDraft.selectedSlot);
     setManualTimes(pendingDraft.manualTimes);
-    setIsWalkIn(pendingDraft.isWalkIn);
     setLookupMethod(pendingDraft.lookupMethod);
     setLookupValue(pendingDraft.lookupValue);
-    setWalkInName(pendingDraft.walkInName);
-    setWalkInPhone(pendingDraft.walkInPhone);
     setSelectedServiceIds(new Set(pendingDraft.selectedServiceIds));
     setNotes(pendingDraft.notes);
     setPendingUserId(pendingDraft.pendingUserId);
@@ -485,7 +647,7 @@ export default function CreateAppointment() {
     // Re-validate rather than trust stale consent — it may have been revoked, or the
     // pet list changed, since the draft was saved.
     if (
-      !pendingDraft.isWalkIn && pendingDraft.pendingUserId &&
+      pendingDraft.pendingUserId &&
       (pendingDraft.consentPhase === 'approved' || pendingDraft.consentPhase === 'pending')
     ) {
       clinicUserSearchService.lookup({ clinicId, userId: pendingDraft.pendingUserId })
@@ -529,7 +691,6 @@ export default function CreateAppointment() {
   // flip (and selectedPetId reset to null) via Pusher/poll while the staff member has
   // already moved on to the services step.
   function isPatientStepValid(): boolean {
-    if (isWalkIn) return !!walkInName.trim();
     return consentPhase === 'approved' && !!approvedUser && selectedPetId !== null;
   }
 
@@ -546,11 +707,7 @@ export default function CreateAppointment() {
     const serviceIds = Array.from(selectedServiceIds).filter((id) => id > 0);
     if (!serviceIds.length) { setServerError('Select at least one service.'); return; }
     if (!isPatientStepValid()) {
-      setServerError(
-        isWalkIn
-          ? 'Enter the walk-in patient name.'
-          : 'Select a pet for this patient before booking — consent status may have changed, go back to the Patient step.',
-      );
+      setServerError('Select a pet for this patient before booking — consent status may have changed, go back to the Patient step.');
       return;
     }
     setSaving(true);
@@ -560,10 +717,8 @@ export default function CreateAppointment() {
         clinicBranchId: Number(selectedBranch),
         clinicStaffId: Number(selectedDoctor),
         clinicServiceIds: serviceIds,
-        userId: !isWalkIn && approvedUser ? approvedUser.userId : undefined,
-        petId: !isWalkIn && approvedUser ? selectedPetId ?? undefined : undefined,
-        contactName: isWalkIn ? walkInName.trim() || undefined : undefined,
-        contactPhone: isWalkIn ? walkInPhone.trim() || undefined : undefined,
+        userId: approvedUser?.userId,
+        petId: selectedPetId ?? undefined,
         scheduledAt: new Date(`${selectedDate}T${finalTime}:00`).toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         notes: notes.trim() || undefined,
@@ -611,7 +766,7 @@ export default function CreateAppointment() {
             variant="outline"
             icon="bi-arrow-left"
             onClick={() => {
-              if (isDraftEmpty({ step, selectedBranch, selectedDate, isWalkIn, lookupValue })) {
+              if (isDraftEmpty({ step, selectedBranch, selectedDate, lookupValue })) {
                 navigate('/appointments');
               } else {
                 setShowDiscardConfirm(true);
@@ -803,8 +958,9 @@ export default function CreateAppointment() {
             <p className={styles.stepCardTitle}>Who is this appointment for?</p>
 
             {/* ── Registered user — consent-aware lookup by code or phone ── */}
-            {!isWalkIn && (
-              <div style={{ display: 'grid', gap: '0.875rem' }}>
+            <div style={{ display: 'grid', gap: '0.875rem' }}>
+              {newClientPhase === 'idle' ? (
+                <>
 
                 {/* Lookup method toggle + input + Search button */}
                 {(consentPhase === 'idle' || consentPhase === 'not_found') && (
@@ -828,7 +984,7 @@ export default function CreateAppointment() {
                     <label className={styles.fieldLabel}>
                       {lookupMethod === 'code' ? 'Patient Lookup Code' : 'Patient Phone Number'}
                     </label>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div className={styles.lookupRow}>
                       <input
                         type={lookupMethod === 'code' ? 'text' : 'tel'}
                         className={styles.textInput}
@@ -836,7 +992,6 @@ export default function CreateAppointment() {
                         value={lookupValue}
                         onChange={(e) => setLookupValue(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && !!lookupValue.trim() && handleLookup()}
-                        style={{ flex: 1 }}
                       />
                       <Button
                         variant="outline"
@@ -853,6 +1008,19 @@ export default function CreateAppointment() {
                       </p>
                     )}
                   </div>
+                )}
+
+                {canCreateClient && consentPhase === 'idle' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (lookupMethod === 'phone' && lookupValue.trim()) setNewPhoneNumber(lookupValue.trim());
+                      setNewClientPhase('user_form');
+                    }}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-primary, #0d9aff)', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem', padding: 0, textAlign: 'left', width: 'fit-content' }}
+                  >
+                    <i className="bi bi-person-plus" /> Walk-in (not on the app)
+                  </button>
                 )}
 
                 {shareRequestError && (
@@ -872,7 +1040,22 @@ export default function CreateAppointment() {
                 {/* No account found */}
                 {consentPhase === 'not_found' && (
                   <div className={`alert alert-info py-2 ${styles.feedbackAlert}`} style={{ marginBottom: 0 }}>
-                    <i className="bi bi-info-circle" /> No account found for this {lookupMethod === 'code' ? 'code' : 'number'}. Use walk-in below, or{' '}
+                    <i className="bi bi-info-circle" /> No account found for this {lookupMethod === 'code' ? 'code' : 'number'}.{' '}
+                    {canCreateClient && (
+                      <>
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                          onClick={() => {
+                            if (lookupMethod === 'phone' && lookupValue.trim()) setNewPhoneNumber(lookupValue.trim());
+                            setNewClientPhase('user_form');
+                          }}
+                        >
+                          Book them as a walk-in
+                        </button>
+                        , or{' '}
+                      </>
+                    )}
                     <button type="button" style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0 }} onClick={resetConsentState}>
                       try again
                     </button>.
@@ -960,38 +1143,9 @@ export default function CreateAppointment() {
                         </p>
                       ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
-                          {approvedUser.pets.map((pet) => {
-                            const isSelected = selectedPetId === pet.id;
-                            return (
-                              <button
-                                key={pet.id}
-                                type="button"
-                                onClick={() => setSelectedPetId(pet.id)}
-                                style={{
-                                  display: 'flex', alignItems: 'center', gap: '0.6rem',
-                                  padding: '0.65rem 0.875rem',
-                                  border: isSelected ? '2px solid var(--color-primary, #0d9aff)' : '1.5px solid #e4e7ec',
-                                  borderRadius: '0.625rem',
-                                  background: isSelected ? 'rgba(13,154,255,0.05)' : '#fff',
-                                  cursor: 'pointer', textAlign: 'left', width: '100%',
-                                  transition: 'border-color 0.12s, background 0.12s',
-                                  boxShadow: isSelected ? '0 0 0 3px rgba(13,154,255,0.1)' : 'none',
-                                }}
-                              >
-                                {pet.imageUrl ? (
-                                  <img src={pet.imageUrl} alt={pet.name} style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                                ) : (
-                                  <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(13,154,255,0.1)', color: 'var(--color-primary, #0d9aff)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>
-                                    <i className="bi bi-heart-fill" />
-                                  </div>
-                                )}
-                                <span style={{ fontSize: '0.875rem', fontWeight: isSelected ? 600 : 500, color: isSelected ? 'var(--color-primary, #0d9aff)' : '#111827', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {pet.name}
-                                </span>
-                                {isSelected && <i className="bi bi-check-circle-fill" style={{ color: 'var(--color-primary, #0d9aff)', flexShrink: 0, fontSize: '0.875rem' }} />}
-                              </button>
-                            );
-                          })}
+                          {approvedUser.pets.map((pet) =>
+                            petCard(pet, selectedPetId === pet.id, () => setSelectedPetId(pet.id)),
+                          )}
                         </div>
                       )}
                     </div>
@@ -1016,36 +1170,139 @@ export default function CreateAppointment() {
                     )}
                   </div>
                 )}
-              </div>
-            )}
+                </>
+              ) : (
+                <>
+                  {newClientError && (
+                    <div className={`alert alert-danger py-2 ${styles.feedbackAlert}`} style={{ marginBottom: 0 }}>
+                      <i className="bi bi-exclamation-circle-fill" /> {newClientError}
+                    </div>
+                  )}
 
-            {/* ── Walk-in — manual details ── */}
-            {isWalkIn && (
-              <div style={{ display: 'grid', gap: '0.75rem' }}>
-                <div>
-                  <label className={styles.fieldLabel}>Patient Name <span style={{ color: '#e74c3c' }}>*</span></label>
-                  <input type="text" className={styles.textInput} placeholder="Full name" value={walkInName} onChange={(e) => setWalkInName(e.target.value)} />
-                </div>
-                <div>
-                  <label className={styles.fieldLabel}>Phone Number</label>
-                  <input type="tel" className={styles.textInput} placeholder="Optional" value={walkInPhone} onChange={(e) => setWalkInPhone(e.target.value)} />
-                </div>
-              </div>
-            )}
+                  {/* ── New client — create an unclaimed user ── */}
+                  {newClientPhase === 'user_form' && (
+                    <div style={{ border: '1px solid #e4e7ec', borderRadius: '0.75rem', padding: '1rem', background: '#fafbff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>
+                          <i className="bi bi-person-plus" /> New client
+                        </p>
+                        <button type="button" onClick={resetNewClientFields} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '1rem', padding: 0 }}>
+                          <i className="bi bi-x-lg" />
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gap: '0.625rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.625rem' }}>
+                          <div>
+                            <label className={styles.fieldLabel}>First Name <span style={{ color: '#e74c3c' }}>*</span></label>
+                            <input type="text" className={styles.textInput} value={newFirstName} onChange={(e) => setNewFirstName(e.target.value)} />
+                          </div>
+                          <div>
+                            <label className={styles.fieldLabel}>Last Name <span style={{ color: '#e74c3c' }}>*</span></label>
+                            <input type="text" className={styles.textInput} value={newLastName} onChange={(e) => setNewLastName(e.target.value)} />
+                          </div>
+                        </div>
+                        <div>
+                          <label className={styles.fieldLabel}>Phone Number <span style={{ color: '#e74c3c' }}>*</span></label>
+                          <input type="tel" className={styles.textInput} placeholder="+201234567890" value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} />
+                        </div>
+                        <div>
+                          <label className={styles.fieldLabel}>Email</label>
+                          <input type="email" className={styles.textInput} placeholder="Optional" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+                          {newClientFieldErrors.email && (
+                            <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#e74c3c' }}>
+                              <i className="bi bi-exclamation-circle" /> {newClientFieldErrors.email}
+                            </p>
+                          )}
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: '#9ca3af' }}>
+                          The owner can claim this account later in the PawPal app using this phone number or email.
+                        </p>
+                        <Button
+                          variant="primary"
+                          size="small"
+                          onClick={handleCreateClientUser}
+                          loading={newClientSaving}
+                          disabled={newClientSaving || !newFirstName.trim() || !newLastName.trim() || !newPhoneNumber.trim()}
+                        >
+                          Continue
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
-            <label className={styles.walkInToggle}>
-              <input
-                type="checkbox"
-                checked={isWalkIn}
-                onChange={(e) => {
-                  const walkIn = e.target.checked;
-                  setIsWalkIn(walkIn);
-                  if (walkIn) resetConsentState();
-                  else { setWalkInName(''); setWalkInPhone(''); }
-                }}
-              />
-              Walk-in (no registered user)
-            </label>
+                  {/* ── New client — pick an existing pet or add a new one ── */}
+                  {newClientPhase === 'pet_step' && (
+                    <div style={{ border: '1px solid #e4e7ec', borderRadius: '0.75rem', padding: '1rem', background: '#fafbff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>
+                          <i className="bi bi-heart" /> {newFirstName} {newLastName} — select or add a pet
+                        </p>
+                        <button type="button" onClick={resetNewClientFields} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '1rem', padding: 0 }}>
+                          <i className="bi bi-x-lg" />
+                        </button>
+                      </div>
+                      {newClientPets.length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                          {newClientPets.map((pet) => petCard(pet, false, () => finalizeNewClient(pet)))}
+                        </div>
+                      )}
+                      <Button variant="outline" size="small" icon="bi-plus-lg" onClick={() => setNewClientPhase('pet_form')}>
+                        Add new pet
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* ── New client — create a pet ── */}
+                  {newClientPhase === 'pet_form' && (
+                    <div style={{ border: '1px solid #e4e7ec', borderRadius: '0.75rem', padding: '1rem', background: '#fafbff' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>
+                          <i className="bi bi-heart-fill" /> Add pet
+                        </p>
+                        <button type="button" onClick={resetNewClientFields} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '1rem', padding: 0 }}>
+                          <i className="bi bi-x-lg" />
+                        </button>
+                      </div>
+                      <div style={{ display: 'grid', gap: '0.625rem' }}>
+                        <div>
+                          <label className={styles.fieldLabel}>Pet Name <span style={{ color: '#e74c3c' }}>*</span></label>
+                          <input type="text" className={styles.textInput} value={newPetName} onChange={(e) => setNewPetName(e.target.value)} />
+                        </div>
+                        <div>
+                          <label className={styles.fieldLabel}>Pet Type <span style={{ color: '#e74c3c' }}>*</span></label>
+                          <select
+                            className={styles.filterSelect}
+                            style={{ width: '100%' }}
+                            value={newPetTypeId}
+                            onChange={(e) => setNewPetTypeId(e.target.value)}
+                            disabled={petTypesLoading}
+                          >
+                            <option value="">{petTypesLoading ? 'Loading…' : 'Choose type…'}</option>
+                            {petTypes.map((t) => (
+                              <option key={t.id} value={String(t.id)}>{t.name}</option>
+                            ))}
+                          </select>
+                          {petTypesError && (
+                            <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#e74c3c' }}>
+                              <i className="bi bi-exclamation-circle" /> {petTypesError}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          variant="primary"
+                          size="small"
+                          onClick={handleCreateClientPet}
+                          loading={newClientSaving}
+                          disabled={newClientSaving || !newPetName.trim() || !newPetTypeId}
+                        >
+                          {newClientPets.length === 0 ? 'Create Pet & Continue' : 'Add Pet & Continue'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -1085,14 +1342,12 @@ export default function CreateAppointment() {
                 <i className="bi bi-person-badge" />
                 <span>Dr. {doctorObj?.firstName} {doctorObj?.lastName}{doctorObj?.role ? ` — ${doctorObj.role.name}` : ''}</span>
               </div>
-              {(isWalkIn ? walkInName : approvedUser) && (
+              {approvedUser && (
                 <div className={styles.summaryRow}>
                   <i className="bi bi-person" />
                   <span>
-                    {isWalkIn
-                      ? walkInName
-                      : `${approvedUser?.firstName} ${approvedUser?.lastName}`}
-                    {!isWalkIn && selectedPetId && approvedUser?.pets && (() => {
+                    {approvedUser.firstName} {approvedUser.lastName}
+                    {selectedPetId && approvedUser.pets && (() => {
                       const pet = approvedUser.pets.find((p) => p.id === selectedPetId);
                       return pet ? ` · ${pet.name}` : '';
                     })()}
@@ -1141,7 +1396,7 @@ export default function CreateAppointment() {
             icon="bi-arrow-left"
             onClick={() => {
               if (step > 1) { setStep((p) => (p - 1) as Step); return; }
-              if (isDraftEmpty({ step, selectedBranch, selectedDate, isWalkIn, lookupValue })) {
+              if (isDraftEmpty({ step, selectedBranch, selectedDate, lookupValue })) {
                 navigate('/appointments');
               } else {
                 setShowDiscardConfirm(true);

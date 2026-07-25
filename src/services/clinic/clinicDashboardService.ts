@@ -52,6 +52,20 @@ const clinicDashboardService = {
     );
     return res.data;
   },
+
+  // Streams a styled .xlsx of the clinic's appointments — not a { success, data }
+  // JSON response, so this goes through clinicApi.getBlob rather than .get.
+  async exportAppointments(
+    clinicId: string | number,
+    params: DashboardDateRangeParams = {},
+    opts?: { signal?: AbortSignal },
+  ): Promise<{ blob: Blob; filename: string | null }> {
+    return clinicApi.getBlob(
+      `/clinics/${clinicId}/dashboard/appointments/export`,
+      { startDate: params.startDate, endDate: params.endDate },
+      opts,
+    );
+  },
 };
 
 export default clinicDashboardService;

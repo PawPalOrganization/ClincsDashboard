@@ -18,6 +18,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/clinic/api': 'https://backend-production-12d0.up.railway.app',
+      '/api': 'https://backend-production-12d0.up.railway.app',
     },
   },
   test: {

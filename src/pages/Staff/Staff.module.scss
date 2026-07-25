@@ -424,6 +424,14 @@
   border-radius: 0.5rem;
   background: #fafafa;
   transition: border-color 0.15s, background 0.15s;
+
+  // The day checkbox + two time inputs + "to" no longer fit on one line on a
+  // narrow card — wrap the time inputs to their own full-width row below the
+  // day name instead of letting the second one run off the edge.
+  @media (max-width: 480px) {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 }
 
 .dayRowActive {
@@ -437,6 +445,10 @@
   gap: 0.5rem;
   cursor: pointer;
   min-width: 110px;
+
+  @media (max-width: 480px) {
+    width: 100%;
+  }
 
   input[type='checkbox'] {
     width: 15px;
@@ -457,6 +469,10 @@
   align-items: center;
   gap: 0.5rem;
   flex: 1;
+
+  @media (max-width: 480px) {
+    width: 100%;
+  }
 }
 
 .timeInput {
@@ -468,6 +484,11 @@
   background: #fff;
   outline: none;
   transition: border-color 0.15s;
+
+  @media (max-width: 480px) {
+    flex: 1;
+    min-width: 0;
+  }
 
   &:focus {
     border-color: var(--color-primary, #0d9aff);
@@ -549,6 +570,17 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+
+  // The photo + URL input + Upload button used to fight for space in one row,
+  // pushing the buttons off-screen. Stack the photo above the controls instead.
+  @media (max-width: 560px) {
+    flex-direction: column;
+
+    > img,
+    > .photoPlaceholder {
+      align-self: center;
+    }
+  }
 }
 
 .photoUrlRow {
@@ -559,6 +591,12 @@
     flex: 1;
     width: auto;
     min-width: 0;
+  }
+
+  @media (max-width: 420px) {
+    flex-direction: column;
+
+    .selectInput { width: 100%; }
   }
 }
 

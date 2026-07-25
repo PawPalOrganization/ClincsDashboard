@@ -459,6 +459,58 @@ export interface DataShareDeniedEvent {
   consentStatus: 'denied';
 }
 
+// ─── Walk-in client onboarding (unclaimed users) ─────────────────────────────
+
+export type ClinicClientAccountStatus = 'claimed' | 'unclaimed';
+
+// POST /clinic/api/clinics/:clinicId/users
+export interface CreateClientUserPayload {
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email?: string;
+  birthDate?: string;
+  gender?: 'male' | 'female' | 'other';
+}
+
+export interface ClientUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email?: string;
+  accountStatus: ClinicClientAccountStatus;
+}
+
+// POST /clinic/api/clinics/:clinicId/users/:userId/pets
+export interface CreateClientPetPayload {
+  name: string;
+  petTypeId: number;
+  petTypeBreedId?: number;
+  size?: string;
+  weight?: string;
+  age?: string;
+  notes?: string;
+  birthdate?: string;
+  adoptionDate?: string;
+  imageUrl?: string;
+  gender?: string;
+}
+
+// GET /api/pet-types (public, proxied same as /clinic/api)
+export interface PetType {
+  id: number;
+  name: string;
+  imageUrl?: string;
+}
+
+// GET /api/pet-type-breeds?petTypeId= (public)
+export interface PetTypeBreed {
+  id: number;
+  name: string;
+  petTypeId: number;
+}
+
 // ─── Pet portal (consent-gated) ───────────────────────────────────────────────
 
 export interface PetMedicine {

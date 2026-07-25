@@ -59,6 +59,43 @@ function buildUrl(path: string, params?: QueryParams): string {
   return query ? `${url}?${query}` : url;
 }
 
+// Shared between handleResponse (JSON calls) and getBlob's error path (file
+// downloads) — an error response is always JSON even when the success response
+// is a binary file, so both need to turn that body into a readable message.
+function buildErrorMessage(status: number, json: unknown): string {
+  const body = json as {
+    message?: string | string[];
+    errors?: Record<string, string[]> | Array<{ msg?: string; message?: string; path?: string }>;
+    error?: string;
+  };
+  const rawMsg = body.message;
+  let message = Array.isArray(rawMsg)
+    ? rawMsg.join('; ')
+    : rawMsg ?? `Request failed with status ${status}`;
+  // Surface field-level validation errors — handles both NestJS array format and object format
+  if (body.errors) {
+    let details = '';
+    if (Array.isArray(body.errors)) {
+      details = body.errors
+        .map((e) => (e.path ? `${e.path}: ${e.msg ?? e.message ?? ''}` : (e.msg ?? e.message ?? '')))
+        .filter(Boolean)
+        .join('; ');
+    } else if (typeof body.errors === 'object') {
+      details = Object.values(body.errors).flat().join('; ');
+    }
+    if (details) message = `${message}: ${details}`;
+  }
+  return message;
+}
+
+function parseContentDispositionFilename(header: string | null): string | null {
+  if (!header) return null;
+  const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match) return decodeURIComponent(utf8Match[1]);
+  const plainMatch = header.match(/filename="?([^";]+)"?/i);
+  return plainMatch ? plainMatch[1] : null;
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (response.status === 401) {
     clearSession();
@@ -78,31 +115,10 @@ async function handleResponse<T>(response: Response): Promise<T> {
   }
 
   if (!response.ok) {
-    const body = json as {
-      message?: string | string[];
-      errors?: Record<string, string[]> | Array<{ msg?: string; message?: string; path?: string }>;
-      error?: string;
-    };
-    const rawMsg = body.message;
-    let message = Array.isArray(rawMsg)
-      ? rawMsg.join('; ')
-      : rawMsg ?? `Request failed with status ${response.status}`;
-    // Surface field-level validation errors — handles both NestJS array format and object format
-    if (body.errors) {
-      let details = '';
-      if (Array.isArray(body.errors)) {
-        details = body.errors
-          .map((e) => (e.path ? `${e.path}: ${e.msg ?? e.message ?? ''}` : (e.msg ?? e.message ?? '')))
-          .filter(Boolean)
-          .join('; ');
-      } else if (typeof body.errors === 'object') {
-        details = Object.values(body.errors).flat().join('; ');
-      }
-      if (details) message = `${message}: ${details}`;
-    }
+    const message = buildErrorMessage(response.status, json);
     // 404 is a valid "not found" HTTP status handled by callers — not a server bug
     if (import.meta.env.DEV && response.status !== 404) {
-      console.error('[API Error]', response.status, JSON.stringify(body));
+      console.error('[API Error]', response.status, JSON.stringify(json));
     }
     throw new ApiError(response.status, message);
   }
@@ -120,6 +136,39 @@ const clinicApi = {
       signal: opts?.signal,
     });
     return handleResponse<T>(response);
+  },
+
+  // For endpoints that stream a file (e.g. an Excel export) instead of JSON —
+  // success responses are read as a Blob rather than parsed with JSON.parse.
+  async getBlob(
+    path: string,
+    params?: QueryParams,
+    opts?: { signal?: AbortSignal },
+  ): Promise<{ blob: Blob; filename: string | null }> {
+    const response = await fetch(buildUrl(path, params), {
+      method: 'GET',
+      headers: buildHeaders(),
+      signal: opts?.signal,
+    });
+
+    if (response.status === 401) {
+      clearSession();
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+      throw new ApiError(401, 'Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      // Error responses are still JSON even though a success response is a file.
+      const text = await response.text();
+      let json: unknown = {};
+      try { json = JSON.parse(text); } catch { /* fall back to the generic status message */ }
+      throw new ApiError(response.status, buildErrorMessage(response.status, json));
+    }
+
+    const blob = await response.blob();
+    return { blob, filename: parseContentDispositionFilename(response.headers.get('Content-Disposition')) };
   },
 
   async post<T>(path: string, body?: unknown): Promise<T> {

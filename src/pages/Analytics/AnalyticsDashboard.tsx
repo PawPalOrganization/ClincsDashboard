@@ -21,6 +21,7 @@ import Meter from '../../components/common/Meter/Meter';
 import SplitBar from '../../components/common/SplitBar/SplitBar';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
 import PageHeaderSkeleton from '../../components/common/Skeleton/PageHeaderSkeleton';
+import Button from '../../components/common/Button/Button';
 import styles from './Analytics.module.scss';
 
 // Emphasis palette: one accent hue + neutral gray per split — safe by construction
@@ -79,6 +80,36 @@ export default function AnalyticsDashboard() {
   function clearRange() {
     setStartDate('');
     setEndDate('');
+  }
+
+  // ── Appointments export ───────────────────────────────────────────────────
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError] = useState('');
+
+  async function handleExport() {
+    // Guards against double-submits — the button is also disabled while loading,
+    // but this covers the gap before React re-renders with the disabled state.
+    if (!clinicId || exportLoading || !dateRangeValid) return;
+    setExportLoading(true);
+    setExportError('');
+    try {
+      const { blob, filename } = await clinicDashboardService.exportAppointments(
+        clinicId,
+        bothFilled ? { startDate, endDate } : {},
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename ?? `clinic-${clinicId}-appointments-${startDate || 'all'}-${endDate || 'all'}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed. Please try again.');
+    } finally {
+      setExportLoading(false);
+    }
   }
 
   // ── KPIs ───────────────────────────────────────────────────────────────────
@@ -341,11 +372,27 @@ export default function AnalyticsDashboard() {
                 >
                   Clear
                 </button>
+                {canViewFinance && (
+                  <Button
+                    variant="outline"
+                    icon="bi-file-earmark-excel"
+                    onClick={handleExport}
+                    loading={exportLoading}
+                    disabled={exportLoading || !dateRangeValid}
+                  >
+                    Export Excel
+                  </Button>
+                )}
               </div>
               {!dateRangeValid && (
                 <p className={styles.dateRangeHint}>
                   <i className="bi bi-exclamation-triangle" /> Pick both a start and end date, or clear both.
                 </p>
+              )}
+              {exportError && (
+                <div className={`alert alert-danger py-2 ${styles.feedbackAlert}`} role="alert">
+                  <i className="bi bi-exclamation-circle-fill" /> {exportError}
+                </div>
               )}
             </div>
           </div>

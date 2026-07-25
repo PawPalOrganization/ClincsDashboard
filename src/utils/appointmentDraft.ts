@@ -8,7 +8,6 @@ export interface AppointmentDraft {
   selectedDoctor: string;
   selectedSlot: string;
   manualTimes: Record<string, string>;
-  isWalkIn: boolean;
   lookupMethod: 'code' | 'phone';
   lookupValue: string;
   consentPhase: 'idle' | 'searching' | 'not_found' | 'none' | 'pending' | 'approved';
@@ -22,8 +21,6 @@ export interface AppointmentDraft {
     pets: PetSummary[];
   } | null;
   selectedPetId: number | null;
-  walkInName: string;
-  walkInPhone: string;
   selectedServiceIds: number[]; // Set serialized to array
   notes: string;
 }
@@ -65,7 +62,7 @@ export function clearAppointmentDraft(clinicId: string, staffId: string | number
 
 /** Nothing worth saving/resuming — an untouched, still-blank step 1. */
 export function isDraftEmpty(
-  draft: Pick<AppointmentDraft, 'step' | 'selectedBranch' | 'selectedDate' | 'isWalkIn' | 'lookupValue'>,
+  draft: Pick<AppointmentDraft, 'step' | 'selectedBranch' | 'selectedDate' | 'lookupValue'>,
 ): boolean {
-  return draft.step === 1 && !draft.selectedBranch && !draft.selectedDate && !draft.isWalkIn && !draft.lookupValue;
+  return draft.step === 1 && !draft.selectedBranch && !draft.selectedDate && !draft.lookupValue;
 }

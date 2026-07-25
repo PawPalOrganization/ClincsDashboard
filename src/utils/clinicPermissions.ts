@@ -28,6 +28,8 @@ export type ClinicPermissionSlug =
   | 'users.search'
   | 'users.share-request'
   | 'users.read'
+  | 'users.create'
+  | 'pets.create'
   | 'reviews.read'
   | 'dashboard.overview.read'
   | 'dashboard.finance.read';
