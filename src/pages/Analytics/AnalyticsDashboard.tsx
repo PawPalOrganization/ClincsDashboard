@@ -23,19 +23,21 @@ import PageHeaderSkeleton from '../../components/common/Skeleton/PageHeaderSkele
 import Button from '../../components/common/Button/Button';
 import styles from './Analytics.module.scss';
 
-// Emphasis palette: each ring's non-hero segment gets its own hue rather than a flat
-// gray — a gray "other" reads as an empty/broken ring once it fills most or all of the
-// circle (e.g. a 0% no-show rate leaves "Completed" as a full gray ring). Colors are
-// pulled straight from the app's theme tokens (src/styles/variables.css) so the rings
-// match the rest of the UI instead of introducing new hues; each pairing is still
-// validated with the dataviz skill's CVD checker (validate_palette.js) — danger/primary,
-// primary/warning and success/info all PASS lightness band, chroma floor, CVD separation
-// and normal-vision floor (danger/success was tried first and FAILs CVD separation, hence
-// primary standing in for "Completed" instead). The routine sub-3:1 contrast WARN is
-// mitigated by the always-visible legend labels.
-const COMPLETED_COLOR = '#0D9AFF'; // --color-primary, paired against No-Show danger '#E74C3C'
-const MANUAL_COLOR = '#F39C12'; // --color-warning, paired against App primary '#0D9AFF'
-const NEW_CLIENT_COLOR = '#3498DB'; // --color-info, paired against Returning success '#27AE60'
+// Emphasis palette: a monochromatic blue scheme (user-supplied palette, darkest to
+// lightest) instead of a per-status hue mix — each ring gets a distinct shade as its
+// hero color, all differentiated by lightness rather than hue, plus the lightest shade
+// shared across every ring's non-hero segment. A flat gray "other" reads as an
+// empty/broken ring once it fills most of the circle (e.g. a 0% no-show rate leaves
+// "Completed" as a full gray ring); the light blue both fixes that and keeps the whole
+// set visibly one family. Lightness-only differentiation is inherently colorblind-safe
+// (CVD affects hue perception, not lightness) — the dataviz skill's CVD checker confirms
+// every pair here clears CVD separation by a wide margin, though the two darkest shades
+// individually read as low-chroma/near-navy against the categorical lightness-band and
+// chroma-floor checks (expected for a monochromatic ramp, not a categorical-hue one).
+const NO_SHOW_COLOR = '#1F3647';
+const APP_COLOR = '#25597E';
+const RETURNING_COLOR = '#227DBF';
+const RING_ACCENT_COLOR = '#5CBBFF'; // lightest shade — shared "other" segment across all three rings
 
 // Revenue/services default an empty date filter to the *current month* only (unlike
 // KPIs, which default to true all-time) — per clinic.types.ts. Sending an explicit
@@ -448,22 +450,22 @@ export default function AnalyticsDashboard() {
                     label="No-Show Rate"
                     subLabel={noShowSubLabel(kpis)}
                     segments={[
-                      { label: 'No-Show', percent: kpis.noShowRate, color: '#e74c3c' },
-                      { label: 'Completed', percent: Number((100 - kpis.noShowRate).toFixed(1)), color: COMPLETED_COLOR },
+                      { label: 'No-Show', percent: kpis.noShowRate, color: NO_SHOW_COLOR },
+                      { label: 'Completed', percent: Number((100 - kpis.noShowRate).toFixed(1)), color: RING_ACCENT_COLOR },
                     ]}
                   />
                   <RingSplit
                     label="App vs Manual Bookings"
                     segments={[
-                      { label: 'App', percent: kpis.appointmentSources.appPercent, color: '#0d9aff' },
-                      { label: 'Manual', percent: kpis.appointmentSources.manualPercent, color: MANUAL_COLOR },
+                      { label: 'App', percent: kpis.appointmentSources.appPercent, color: APP_COLOR },
+                      { label: 'Manual', percent: kpis.appointmentSources.manualPercent, color: RING_ACCENT_COLOR },
                     ]}
                   />
                   <RingSplit
                     label="Returning Clients"
                     segments={[
-                      { label: 'Returning', percent: kpis.clientComposition.returningPercent, color: '#10b981' },
-                      { label: 'New', percent: kpis.clientComposition.newPercent, color: NEW_CLIENT_COLOR },
+                      { label: 'Returning', percent: kpis.clientComposition.returningPercent, color: RETURNING_COLOR },
+                      { label: 'New', percent: kpis.clientComposition.newPercent, color: RING_ACCENT_COLOR },
                     ]}
                   />
                 </div>

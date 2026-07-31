@@ -18,13 +18,12 @@ import StatCard from '../../components/common/StatCard/StatCard';
 import RingSplit from '../../components/common/RingSplit/RingSplit';
 import styles from './ClinicDashboard.module.scss';
 
-// Each ring's non-hero segment gets its own hue rather than a flat gray — a gray
-// "other" reads as an empty/broken ring once it fills most or all of the circle
-// (e.g. a 0% no-show rate leaves "Completed" as a full gray ring). Colors are pulled
-// from the app's theme tokens (src/styles/variables.css), same pairs as
-// AnalyticsDashboard, validated with the dataviz skill's CVD checker.
-const COMPLETED_COLOR = '#0D9AFF'; // --color-primary, paired against No-Show danger '#E74C3C'
-const MANUAL_COLOR = '#F39C12'; // --color-warning, paired against App primary '#0D9AFF'
+// Monochromatic blue scheme (user-supplied palette, darkest to lightest) — same
+// palette as AnalyticsDashboard, validated with the dataviz skill's CVD checker.
+// See AnalyticsDashboard.tsx for the full rationale.
+const NO_SHOW_COLOR = '#1F3647';
+const APP_COLOR = '#25597E';
+const RING_ACCENT_COLOR = '#5CBBFF'; // lightest shade — shared "other" segment across both rings
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -298,8 +297,8 @@ export default function ClinicDashboard() {
             subLabel="All time"
             error={errors.kpis}
             segments={[
-              { label: 'No-Show', percent: kpis?.noShowRate ?? 0, color: '#e74c3c' },
-              { label: 'Completed', percent: Number((100 - (kpis?.noShowRate ?? 0)).toFixed(1)), color: COMPLETED_COLOR },
+              { label: 'No-Show', percent: kpis?.noShowRate ?? 0, color: NO_SHOW_COLOR },
+              { label: 'Completed', percent: Number((100 - (kpis?.noShowRate ?? 0)).toFixed(1)), color: RING_ACCENT_COLOR },
             ]}
           />
         )}
@@ -308,8 +307,8 @@ export default function ClinicDashboard() {
             label="App vs Manual Bookings"
             error={errors.kpis}
             segments={[
-              { label: 'App', percent: kpis?.appointmentSources.appPercent ?? 0, color: '#0d9aff' },
-              { label: 'Manual', percent: kpis?.appointmentSources.manualPercent ?? 0, color: MANUAL_COLOR },
+              { label: 'App', percent: kpis?.appointmentSources.appPercent ?? 0, color: APP_COLOR },
+              { label: 'Manual', percent: kpis?.appointmentSources.manualPercent ?? 0, color: RING_ACCENT_COLOR },
             ]}
           />
         )}
