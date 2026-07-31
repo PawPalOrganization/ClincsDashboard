@@ -2,6 +2,7 @@ import clinicApi from './clinicApi';
 import type {
   ApiResponse,
   ShareRequestPayload,
+  ShareRequestResponse,
   UserLookupParams,
   UserSearchResponse,
 } from '../../types/clinic.types';
@@ -30,9 +31,11 @@ const clinicUserSearchService = {
 
   // POST /clinic/api/users/share-request  { clinicId, userHash | phoneNumber }
   // Sends push + email to the pet owner requesting access.
-  // Idempotent when already pending (no duplicate push); 409 if already approved.
-  async requestShare(payload: ShareRequestPayload): Promise<{ shareRequestId: number }> {
-    const res = await clinicApi.post<ApiResponse<{ shareRequestId: number }>>(
+  // Idempotent when already pending (no duplicate push). If the user already has an
+  // approved share on file, this now returns 200 with consentStatus: 'approved' and
+  // notifies the owner to share an additional pet (throttled) — it no longer 409s.
+  async requestShare(payload: ShareRequestPayload): Promise<ShareRequestResponse> {
+    const res = await clinicApi.post<ApiResponse<ShareRequestResponse>>(
       '/users/share-request',
       {
         clinicId: Number(payload.clinicId),

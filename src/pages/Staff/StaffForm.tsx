@@ -72,6 +72,47 @@ function buildHoursState(workingHours?: BranchWorkingHour[]): HourEntry[] {
   });
 }
 
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function fromMinutes(total: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
+}
+
+interface DayAvailability {
+  startTime: string;
+  endTime: string;
+}
+
+// Per day, the widest start-to-end window across the given branches — used as a hint
+// (min/max on the time inputs) and to disable days no assigned branch is open, so
+// staff can't set hours that will be rejected by the backend's own working-hours
+// validation only after clicking save. A day missing from the map means none of the
+// branches are open then. Returns null (no constraint) if none of the branches have
+// any hours configured at all — same skip condition the backend itself applies.
+function unionBranchHoursByDay(relevantBranches: ClinicBranch[]): Map<number, DayAvailability> | null {
+  if (!relevantBranches.some((b) => b.workingHours?.length)) return null;
+
+  const byDay = new Map<number, DayAvailability>();
+  for (let dow = 0; dow <= 6; dow++) {
+    let start: number | null = null;
+    let end: number | null = null;
+    for (const branch of relevantBranches) {
+      const wh = branch.workingHours?.find((h) => h.dayOfWeek === dow);
+      if (!wh) continue;
+      const s = toMinutes(wh.startTime);
+      const e = toMinutes(wh.endTime);
+      start = start === null ? s : Math.min(start, s);
+      end = end === null ? e : Math.max(end, e);
+    }
+    if (start !== null && end !== null) byDay.set(dow, { startTime: fromMinutes(start), endTime: fromMinutes(end) });
+  }
+  return byDay;
+}
+
 export default function StaffForm({
   mode,
   defaultValues,
@@ -128,7 +169,18 @@ export default function StaffForm({
   );
   const [joinedAt, setJoinedAt] = useState(dateInputValue(defaultValues?.joinedAt));
   const [errors, setErrors] = useState<FormErrors>({});
+  const [hoursError, setHoursError] = useState('');
   const [hours, setHours] = useState<HourEntry[]>(() => buildHoursState(defaultValues?.workingHours));
+
+  // Create mode: just the single branch being picked below. Edit mode: whichever
+  // branches this staff member is already assigned to (assignment itself happens on
+  // a separate page) — cross-referenced against `branches` for full workingHours data,
+  // since `defaultValues.branches` may only carry a partial nested record.
+  const relevantBranches: ClinicBranch[] =
+    mode === 'create'
+      ? branches.filter((b) => String(b.id) === clinicBranchId)
+      : branches.filter((b) => defaultValues?.branches?.some((ab) => String(ab.id) === String(b.id)));
+  const dayAvailability = unionBranchHoursByDay(relevantBranches);
 
   function toggleDay(dayOfWeek: number) {
     setHours((prev) =>
@@ -173,6 +225,19 @@ export default function StaffForm({
     }
 
     setErrors(next);
+
+    // Belt-and-suspenders on top of the checkbox being disabled for closed days below
+    // — catches hours set before an assigned branch's schedule changed out from under
+    // them, rather than only surfacing it via the backend's 400 after Save.
+    setHoursError('');
+    if (dayAvailability) {
+      const badDay = hours.find((h) => h.enabled && !dayAvailability.has(h.dayOfWeek));
+      if (badDay) {
+        setHoursError(`${DAY_NAMES[badDay.dayOfWeek]} hours won't be accepted — no assigned branch is open that day.`);
+        return false;
+      }
+    }
+
     return Object.keys(next).length === 0;
   }
 
@@ -518,45 +583,70 @@ export default function StaffForm({
           </p>
         </div>
 
-        <div className={styles.hoursTable}>
-          {hours.map((entry) => (
-            <div
-              key={entry.dayOfWeek}
-              className={`${styles.dayRow} ${entry.enabled ? styles.dayRowActive : ''}`}
-            >
-              <label className={styles.dayCheck}>
-                <input
-                  type="checkbox"
-                  checked={entry.enabled}
-                  onChange={() => toggleDay(entry.dayOfWeek)}
-                  disabled={saving || readOnly}
-                />
-                <span className={styles.dayName}>{DAY_NAMES[entry.dayOfWeek]}</span>
-              </label>
+        {hoursError && (
+          <p className={styles.hoursWarning}>
+            <i className="bi bi-exclamation-triangle-fill" /> {hoursError}
+          </p>
+        )}
 
-              {entry.enabled ? (
-                <div className={styles.timeInputs}>
+        <div className={styles.hoursTable}>
+          {hours.map((entry) => {
+            const dayInfo = dayAvailability?.get(entry.dayOfWeek);
+            // Only when branches have hours configured at all AND none of them are
+            // open this day — if nothing's configured, there's nothing to enforce
+            // (same skip condition the backend itself applies).
+            const dayClosed = !!dayAvailability && !dayInfo;
+            return (
+              <div
+                key={entry.dayOfWeek}
+                className={`${styles.dayRow} ${entry.enabled ? styles.dayRowActive : ''}`}
+              >
+                <label className={styles.dayCheck}>
                   <input
-                    type="time"
-                    className={styles.timeInput}
-                    value={entry.startTime}
-                    onChange={(e) => updateHour(entry.dayOfWeek, 'startTime', e.target.value)}
-                    disabled={saving || readOnly}
+                    type="checkbox"
+                    checked={entry.enabled}
+                    onChange={() => toggleDay(entry.dayOfWeek)}
+                    // Already-enabled stale days (set before an assigned branch's
+                    // schedule changed) stay togglable so staff can turn them off —
+                    // only block turning a still-closed day ON.
+                    disabled={saving || readOnly || (dayClosed && !entry.enabled)}
                   />
-                  <span className={styles.timeSep}>to</span>
-                  <input
-                    type="time"
-                    className={styles.timeInput}
-                    value={entry.endTime}
-                    onChange={(e) => updateHour(entry.dayOfWeek, 'endTime', e.target.value)}
-                    disabled={saving || readOnly}
-                  />
-                </div>
-              ) : (
-                <span className={styles.dayClosed}>Closed</span>
-              )}
-            </div>
-          ))}
+                  <span className={styles.dayName}>{DAY_NAMES[entry.dayOfWeek]}</span>
+                </label>
+
+                {entry.enabled ? (
+                  <div className={styles.timeInputs}>
+                    <input
+                      type="time"
+                      className={styles.timeInput}
+                      value={entry.startTime}
+                      onChange={(e) => updateHour(entry.dayOfWeek, 'startTime', e.target.value)}
+                      disabled={saving || readOnly}
+                      min={dayInfo?.startTime}
+                      max={dayInfo?.endTime}
+                    />
+                    <span className={styles.timeSep}>to</span>
+                    <input
+                      type="time"
+                      className={styles.timeInput}
+                      value={entry.endTime}
+                      onChange={(e) => updateHour(entry.dayOfWeek, 'endTime', e.target.value)}
+                      disabled={saving || readOnly}
+                      min={dayInfo?.startTime}
+                      max={dayInfo?.endTime}
+                    />
+                    {dayClosed && (
+                      <span className={styles.dayHoursWarning}>
+                        <i className="bi bi-exclamation-triangle-fill" /> No assigned branch is open this day
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className={styles.dayClosed}>{dayClosed ? 'Branch closed' : 'Closed'}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 

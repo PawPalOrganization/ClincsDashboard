@@ -50,15 +50,69 @@ function generateSlots(start: string, end: string, step = 30): string[] {
   return slots;
 }
 
+function toMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function fromMinutes(total: number): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
+}
+
 // null  = no workingHours data on this staff object → show manual time input
-// []    = has data, but doctor is off on this day
-// [...] = available time slots
-function getSlotsForDate(doctor: ClinicStaff, date: string): string[] | null {
+// []    = doctor (or the branch) is off this day, or their hours don't overlap at all
+// [...] = available time slots, clamped to the branch's hours when the branch has any
+//         configured (matches the backend's now-authoritative "staff hours intersected
+//         with branch hours" rule — booking outside this window gets rejected server-side)
+function getSlotsForDate(doctor: ClinicStaff, date: string, branchHours?: BranchWorkingHour[]): string[] | null {
   if (!doctor.workingHours?.length) return null;
   const dow = new Date(date + 'T12:00:00').getDay();
   const wh = doctor.workingHours.find((h: BranchWorkingHour) => h.dayOfWeek === dow);
   if (!wh) return [];
-  return generateSlots(wh.startTime, wh.endTime);
+
+  // A branch with no hours configured at all imposes no constraint — same as the
+  // backend's assertWithinBranchWorkingHours, which skips enforcement in that case.
+  if (!branchHours?.length) return generateSlots(wh.startTime, wh.endTime);
+
+  const branchWh = branchHours.find((h) => h.dayOfWeek === dow);
+  if (!branchWh) return []; // branch has hours configured but is closed this day
+
+  const start = Math.max(toMinutes(wh.startTime), toMinutes(branchWh.startTime));
+  const end = Math.min(toMinutes(wh.endTime), toMinutes(branchWh.endTime));
+  if (start >= end) return [];
+  return generateSlots(fromMinutes(start), fromMinutes(end));
+}
+
+// null    = branch has no hours configured at all → no constraint to apply
+// 'closed' = branch has hours configured, but not for this day
+// [entry]  = the branch's open/close window for this day
+function getBranchHoursForDate(
+  branchHours: BranchWorkingHour[] | undefined,
+  date: string,
+): BranchWorkingHour | 'closed' | null {
+  if (!branchHours?.length) return null;
+  const dow = new Date(date + 'T12:00:00').getDay();
+  return branchHours.find((h) => h.dayOfWeek === dow) ?? 'closed';
+}
+
+// Used for the manual time-entry fallback (a doctor with no workingHours data at all),
+// which — unlike the generated slot buttons — isn't already clamped to branch hours by
+// construction. Lets the picker itself reject an out-of-range time instead of only
+// finding out via a 400 at submit.
+function isTimeWithinBranchHours(time: string, branchDayHours: BranchWorkingHour | 'closed' | null): boolean {
+  if (!branchDayHours) return true;
+  if (branchDayHours === 'closed') return false;
+  const t = toMinutes(time);
+  return t >= toMinutes(branchDayHours.startTime) && t < toMinutes(branchDayHours.endTime);
+}
+
+// Egyptian mobile local part is always 10 digits after the country code (e.g.
+// "1012345678" in +201012345678 / 01012345678) — take the last 10 digits regardless
+// of which prefix format the source string used. Also used as the phone input's
+// onChange filter, so pasted text in any format reduces to the right digits.
+function egyptLocalDigits(raw: string): string {
+  return raw.replace(/\D/g, '').slice(-10);
 }
 
 function fmt(time: string): string {
@@ -424,41 +478,38 @@ export default function CreateAppointment() {
     setShareRequestLoading(true);
     setShareRequestError('');
     try {
-      await clinicUserSearchService.requestShare({
+      const res = await clinicUserSearchService.requestShare({
         clinicId,
         userHash: foundIdentifier.type === 'userHash' ? foundIdentifier.value : undefined,
         phoneNumber: foundIdentifier.type === 'phoneNumber' ? foundIdentifier.value : undefined,
       });
-      setConsentPhase('pending');
-    } catch (err) {
-      // 409 = already approved — re-fetch by userId (works regardless of which identifier found them)
-      const status = (err as { status?: number }).status;
-      if (status === 409 && pendingUserId) {
-        try {
-          const profile = await clinicUserSearchService.lookup({ clinicId, userId: pendingUserId });
-          if (profile.found && profile.consentStatus === 'approved') {
-            setConsentPhase('approved');
-            setApprovedUser(profile);
-            setSelectedPetId(null);
-          }
-        } catch {
-          setShareRequestError('Failed to fetch consent status. Please retry.');
+      // The owner may have already approved this clinic between page load and this
+      // click (stale FE state) — the backend reports that directly via consentStatus
+      // now instead of 409ing, so re-fetch the full profile in that case rather than
+      // showing a "pending" state that will never resolve.
+      if (res.consentStatus === 'approved' && pendingUserId) {
+        const profile = await clinicUserSearchService.lookup({ clinicId, userId: pendingUserId });
+        if (profile.found && profile.consentStatus === 'approved') {
+          setConsentPhase('approved');
+          setApprovedUser(profile);
+          setSelectedPetId(null);
+        } else {
+          setConsentPhase('pending');
         }
       } else {
-        setShareRequestError(err instanceof Error ? err.message : 'Failed to send request.');
+        setConsentPhase('pending');
       }
+    } catch (err) {
+      setShareRequestError(err instanceof Error ? err.message : 'Failed to send request.');
     } finally {
       setShareRequestLoading(false);
     }
   }
 
   // Asks the owner to expand an already-approved share to cover a pet not currently
-  // in `approvedUser.pets`. Note: today's backend contract 409s "already approved" for
-  // any repeat call to /users/share-request once consent is approved — there is no
-  // documented endpoint yet for adding a pet to an existing share, so this always
-  // surfaces the explanatory message below rather than a real pending state. Needs
-  // backend support (either letting share-request succeed again, or a dedicated
-  // "add pet to share" endpoint) to become a functional flow.
+  // in `approvedUser.pets`. A repeat call to /users/share-request once consent is
+  // already approved now returns 200 and notifies the owner to share an additional pet
+  // (throttled server-side) instead of 409ing.
   async function handleRequestAdditionalPetShare() {
     if (!clinicId || !foundIdentifier) return;
     setAdditionalPetShareLoading(true);
@@ -469,16 +520,9 @@ export default function CreateAppointment() {
         userHash: foundIdentifier.type === 'userHash' ? foundIdentifier.value : undefined,
         phoneNumber: foundIdentifier.type === 'phoneNumber' ? foundIdentifier.value : undefined,
       });
-      setAdditionalPetShareMessage('Request sent — ask the owner to check their Paw-Pal app.');
+      setAdditionalPetShareMessage('The owner has been notified to share an additional pet from their PawPal app.');
     } catch (err) {
-      const status = (err as { status?: number }).status;
-      if (status === 409) {
-        setAdditionalPetShareMessage(
-          'This owner already has an active data-sharing approval on file. To share an additional pet, ask them to update sharing from their Paw-Pal app.',
-        );
-      } else {
-        setAdditionalPetShareMessage(err instanceof Error ? err.message : 'Failed to send request.');
-      }
+      setAdditionalPetShareMessage(err instanceof Error ? err.message : 'Failed to send request.');
     } finally {
       setAdditionalPetShareLoading(false);
     }
@@ -515,8 +559,8 @@ export default function CreateAppointment() {
 
   async function handleCreateClientUser() {
     if (!clinicId) return;
-    if (!newFirstName.trim() || !newLastName.trim() || !newPhoneNumber.trim()) {
-      setNewClientError('First name, last name, and phone number are required.');
+    if (!newFirstName.trim() || !newLastName.trim() || newPhoneNumber.length !== 10) {
+      setNewClientError('First name, last name, and a full 10-digit phone number are required.');
       return;
     }
     setNewClientSaving(true);
@@ -526,7 +570,7 @@ export default function CreateAppointment() {
       const user = await clinicClientsService.createUser(clinicId, {
         firstName: newFirstName.trim(),
         lastName: newLastName.trim(),
-        phoneNumber: newPhoneNumber.trim(),
+        phoneNumber: `0${newPhoneNumber}`,
         email: newEmail.trim() || undefined,
       });
       setNewClientUserId(user.id);
@@ -564,7 +608,7 @@ export default function CreateAppointment() {
       userId: newClientUserId!,
       firstName: newFirstName.trim(),
       lastName: newLastName.trim(),
-      phoneNumber: newPhoneNumber.trim(),
+      phoneNumber: `0${newPhoneNumber}`,
       pets: newClientPets.some((p) => p.id === pet.id) ? newClientPets : [...newClientPets, pet],
     });
     setSelectedPetId(pet.id);
@@ -696,7 +740,16 @@ export default function CreateAppointment() {
 
   function canAdvance(): boolean {
     if (step === 1) return !!selectedBranch && !!selectedDate;
-    if (step === 2) return !!selectedDoctor && !!finalTime;
+    if (step === 2) {
+      if (!selectedDoctor || !finalTime) return false;
+      // Generated slot buttons are already clamped to branch hours by construction —
+      // only a manually-entered time (no slot selected) needs this extra check.
+      if (!selectedSlot) {
+        const branchDayHours = getBranchHoursForDate(selectedBranchDetail?.workingHours, selectedDate);
+        return isTimeWithinBranchHours(finalTime, branchDayHours);
+      }
+      return true;
+    }
     if (step === 3) return isPatientStepValid();
     if (step === 4) return isPatientStepValid() && validServices.length > 0 && selectedServiceIds.size > 0;
     return false;
@@ -704,6 +757,16 @@ export default function CreateAppointment() {
 
   async function handleSubmit() {
     if (!finalTime) return;
+    // Re-check alongside the patient/consent re-check below — branch hours can't
+    // change mid-booking the way consent can, but this keeps the same "don't trust
+    // step-2 state blindly by the time we're on step 4" posture as isPatientStepValid.
+    if (!selectedSlot) {
+      const branchDayHours = getBranchHoursForDate(selectedBranchDetail?.workingHours, selectedDate);
+      if (!isTimeWithinBranchHours(finalTime, branchDayHours)) {
+        setServerError('This time is outside the branch\'s working hours. Go back to the Doctor & Time step and pick a valid time.');
+        return;
+      }
+    }
     const serviceIds = Array.from(selectedServiceIds).filter((id) => id > 0);
     if (!serviceIds.length) { setServerError('Select at least one service.'); return; }
     if (!isPatientStepValid()) {
@@ -875,10 +938,14 @@ export default function CreateAppointment() {
 
             {!loadingDoctors && doctors.length > 0 && (
               <div className={styles.doctorGrid}>
-                {doctors.map((doc) => {
-                  const slots = getSlotsForDate(doc, selectedDate);
+                {(() => {
+                  const branchDayHours = getBranchHoursForDate(selectedBranchDetail?.workingHours, selectedDate);
+                  return doctors.map((doc) => {
+                  const slots = getSlotsForDate(doc, selectedDate, selectedBranchDetail?.workingHours);
                   const isSelected = selectedDoctor === String(doc.id);
                   const isOff = slots !== null && slots.length === 0;
+                  const manualTime = manualTimes[String(doc.id)] ?? '';
+                  const manualTimeInvalid = !!manualTime && !isTimeWithinBranchHours(manualTime, branchDayHours);
 
                   return (
                     <div
@@ -932,21 +999,38 @@ export default function CreateAppointment() {
 
                       {/* No schedule data — manual fallback */}
                       {slots === null && (
-                        <div className={styles.manualTimeWrap}>
-                          <span className={styles.manualTimeLabel}>
-                            <i className="bi bi-clock" /> No schedule set — enter time manually
-                          </span>
-                          <input
-                            type="time"
-                            className={styles.timeInput}
-                            value={manualTimes[String(doc.id)] ?? ''}
-                            onChange={(e) => setManualTime(String(doc.id), e.target.value)}
-                          />
-                        </div>
+                        branchDayHours === 'closed' ? (
+                          <p className={styles.doctorOffLabel}>
+                            <i className="bi bi-calendar-x" /> Branch is closed this day — no time can be booked.
+                          </p>
+                        ) : (
+                          <div className={styles.manualTimeWrap}>
+                            <span className={styles.manualTimeLabel}>
+                              <i className="bi bi-clock" />
+                              {branchDayHours
+                                ? ` Enter a time within branch hours (${fmt(branchDayHours.startTime)}–${fmt(branchDayHours.endTime)})`
+                                : ' No schedule set — enter time manually'}
+                            </span>
+                            <input
+                              type="time"
+                              className={styles.timeInput}
+                              value={manualTime}
+                              min={branchDayHours ? branchDayHours.startTime : undefined}
+                              max={branchDayHours ? branchDayHours.endTime : undefined}
+                              onChange={(e) => setManualTime(String(doc.id), e.target.value)}
+                            />
+                            {manualTimeInvalid && (
+                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#e74c3c', width: '100%' }}>
+                                <i className="bi bi-exclamation-circle" /> Outside branch hours — this time can't be booked.
+                              </p>
+                            )}
+                          </div>
+                        )
                       )}
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
             )}
           </div>
@@ -1014,7 +1098,7 @@ export default function CreateAppointment() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (lookupMethod === 'phone' && lookupValue.trim()) setNewPhoneNumber(lookupValue.trim());
+                      if (lookupMethod === 'phone' && lookupValue.trim()) setNewPhoneNumber(egyptLocalDigits(lookupValue));
                       setNewClientPhase('user_form');
                     }}
                     style={{ background: 'none', border: 'none', color: 'var(--color-primary, #0d9aff)', textDecoration: 'underline', cursor: 'pointer', fontSize: '0.8rem', padding: 0, textAlign: 'left', width: 'fit-content' }}
@@ -1047,7 +1131,7 @@ export default function CreateAppointment() {
                           type="button"
                           style={{ background: 'none', border: 'none', color: 'inherit', textDecoration: 'underline', cursor: 'pointer', padding: 0, fontWeight: 600 }}
                           onClick={() => {
-                            if (lookupMethod === 'phone' && lookupValue.trim()) setNewPhoneNumber(lookupValue.trim());
+                            if (lookupMethod === 'phone' && lookupValue.trim()) setNewPhoneNumber(egyptLocalDigits(lookupValue));
                             setNewClientPhase('user_form');
                           }}
                         >
@@ -1203,7 +1287,22 @@ export default function CreateAppointment() {
                         </div>
                         <div>
                           <label className={styles.fieldLabel}>Phone Number <span style={{ color: '#e74c3c' }}>*</span></label>
-                          <input type="tel" className={styles.textInput} placeholder="+201234567890" value={newPhoneNumber} onChange={(e) => setNewPhoneNumber(e.target.value)} />
+                          <div className={styles.phoneInputRow}>
+                            <span className={styles.phonePrefix}>+20</span>
+                            <input
+                              type="tel"
+                              inputMode="numeric"
+                              className={styles.textInput}
+                              placeholder="1012345678"
+                              value={newPhoneNumber}
+                              onChange={(e) => setNewPhoneNumber(egyptLocalDigits(e.target.value))}
+                            />
+                          </div>
+                          {newPhoneNumber && newPhoneNumber.length < 10 && (
+                            <p style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', color: '#e74c3c' }}>
+                              <i className="bi bi-exclamation-circle" /> Enter all 10 digits after +20.
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className={styles.fieldLabel}>Email</label>
@@ -1222,7 +1321,7 @@ export default function CreateAppointment() {
                           size="small"
                           onClick={handleCreateClientUser}
                           loading={newClientSaving}
-                          disabled={newClientSaving || !newFirstName.trim() || !newLastName.trim() || !newPhoneNumber.trim()}
+                          disabled={newClientSaving || !newFirstName.trim() || !newLastName.trim() || newPhoneNumber.length !== 10}
                         >
                           Continue
                         </Button>

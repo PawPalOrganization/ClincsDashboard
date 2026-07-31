@@ -325,9 +325,9 @@ export default function ServicesList() {
       ) : (
         <div className={styles.pageHeader}>
           <div>
-            <h1 className={styles.pageTitle}>Services</h1>
+            <h1 className={styles.pageTitle}>Custom Services</h1>
             <p className={styles.pageSubtitle}>
-              {total > 0 ? `${total} service${total !== 1 ? 's' : ''} in catalog` : 'Manage your clinic service catalog'}
+              {total > 0 ? `${total} custom service${total !== 1 ? 's' : ''} in catalog` : 'Manage your clinic’s custom service catalog'}
             </p>
           </div>
           {canCreate && (

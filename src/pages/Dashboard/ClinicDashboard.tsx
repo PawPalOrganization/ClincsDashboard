@@ -15,11 +15,16 @@ import type {
 } from '../../types/clinic.types';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
 import StatCard from '../../components/common/StatCard/StatCard';
-import Meter from '../../components/common/Meter/Meter';
-import SplitBar from '../../components/common/SplitBar/SplitBar';
+import RingSplit from '../../components/common/RingSplit/RingSplit';
 import styles from './ClinicDashboard.module.scss';
 
-const NEUTRAL = '#cbd5e1';
+// Each ring's non-hero segment gets its own hue rather than a flat gray — a gray
+// "other" reads as an empty/broken ring once it fills most or all of the circle
+// (e.g. a 0% no-show rate leaves "Completed" as a full gray ring). Colors are pulled
+// from the app's theme tokens (src/styles/variables.css), same pairs as
+// AnalyticsDashboard, validated with the dataviz skill's CVD checker.
+const COMPLETED_COLOR = '#0D9AFF'; // --color-primary, paired against No-Show danger '#E74C3C'
+const MANUAL_COLOR = '#F39C12'; // --color-warning, paired against App primary '#0D9AFF'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -288,27 +293,24 @@ export default function ClinicDashboard() {
           />
         )}
         {canViewOverviewKpis && (
-          <Meter
-            icon="bi-graph-down-arrow"
-            iconBg="rgba(231,76,60,0.10)"
-            iconColor="#e74c3c"
-            value={kpis?.noShowRate ?? 0}
+          <RingSplit
             label="No-Show Rate"
             subLabel="All time"
             error={errors.kpis}
+            segments={[
+              { label: 'No-Show', percent: kpis?.noShowRate ?? 0, color: '#e74c3c' },
+              { label: 'Completed', percent: Number((100 - (kpis?.noShowRate ?? 0)).toFixed(1)), color: COMPLETED_COLOR },
+            ]}
           />
         )}
         {canViewOverviewKpis && (
-          <SplitBar
-            icon="bi-phone"
-            iconBg="rgba(13,154,255,0.10)"
-            iconColor="#0d9aff"
+          <RingSplit
             label="App vs Manual Bookings"
+            error={errors.kpis}
             segments={[
               { label: 'App', percent: kpis?.appointmentSources.appPercent ?? 0, color: '#0d9aff' },
-              { label: 'Manual', percent: kpis?.appointmentSources.manualPercent ?? 0, color: NEUTRAL },
+              { label: 'Manual', percent: kpis?.appointmentSources.manualPercent ?? 0, color: MANUAL_COLOR },
             ]}
-            error={errors.kpis}
           />
         )}
       </div>

@@ -4,6 +4,7 @@ import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
+import { canFinishAppointment } from '../../utils/appointmentTiming';
 import type { Appointment, ClinicBranch } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import styles from './Appointments.module.scss';
@@ -174,6 +175,8 @@ export default function TodayQueue() {
                             type="button"
                             className={`${styles.queueActionBtn} ${styles.finish}`}
                             onClick={() => handleFinish(appt.id)}
+                            disabled={!canFinishAppointment(appt.scheduledAt)}
+                            title={canFinishAppointment(appt.scheduledAt) ? undefined : 'Available starting 1 hour before the scheduled time'}
                           >
                             <i className="bi bi-check-lg" /> Finish
                           </button>

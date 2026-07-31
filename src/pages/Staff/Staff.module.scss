@@ -467,6 +467,7 @@
 .timeInputs {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   flex: 1;
 
@@ -510,6 +511,24 @@
   font-size: 0.8rem;
   color: #9ca3af;
   font-style: italic;
+}
+
+.dayHoursWarning {
+  width: 100%;
+  font-size: 0.75rem;
+  color: #e74c3c;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.hoursWarning {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  color: #e74c3c;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .assignmentEmpty {

@@ -4,6 +4,7 @@ import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
 import { formatPatientDisplayName } from '../../utils/formatPatientDisplayName';
+import { canFinishAppointment } from '../../utils/appointmentTiming';
 import type { Appointment, AppointmentStatus } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
@@ -303,30 +304,41 @@ export default function AppointmentDetail() {
             </div>
           </div>
 
-          {(canUpdate || canCancel) && appointment.status === 'reserved' && (
-            <div className={styles.detailActions}>
-              {canUpdate && (
-                <Button
-                  variant="primary"
-                  icon="bi-check-lg"
-                  onClick={handleFinish}
-                  disabled={acting}
-                >
-                  Mark as Finished
-                </Button>
-              )}
-              {canCancel && (
-                <Button
-                  variant="outline"
-                  icon="bi-x-lg"
-                  onClick={handleCancel}
-                  disabled={acting}
-                >
-                  Cancel Appointment
-                </Button>
-              )}
-            </div>
-          )}
+          {(canUpdate || canCancel) && appointment.status === 'reserved' && (() => {
+            const finishAllowed = canFinishAppointment(appointment.scheduledAt);
+            return (
+              <>
+                <div className={styles.detailActions}>
+                  {canUpdate && (
+                    <Button
+                      variant="primary"
+                      icon="bi-check-lg"
+                      onClick={handleFinish}
+                      disabled={acting || !finishAllowed}
+                      title={finishAllowed ? undefined : 'Available starting 1 hour before the scheduled time'}
+                    >
+                      Mark as Finished
+                    </Button>
+                  )}
+                  {canCancel && (
+                    <Button
+                      variant="outline"
+                      icon="bi-x-lg"
+                      onClick={handleCancel}
+                      disabled={acting}
+                    >
+                      Cancel Appointment
+                    </Button>
+                  )}
+                </div>
+                {canUpdate && !finishAllowed && (
+                  <p className={styles.finishHint}>
+                    <i className="bi bi-info-circle" /> Mark as Finished unlocks 1 hour before the scheduled time.
+                  </p>
+                )}
+              </>
+            );
+          })()}
         </>
       )}
     </div>

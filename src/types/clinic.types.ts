@@ -440,6 +440,14 @@ export interface ShareRequestPayload {
   phoneNumber?: string;
 }
 
+// Response from POST /clinic/api/users/share-request. consentStatus is 'approved' when
+// the target user already had an approved share on file (backend notifies them to share
+// an additional pet rather than granting anything new here) — 'pending' for a fresh request.
+export interface ShareRequestResponse {
+  shareRequestId: number;
+  consentStatus?: 'pending' | 'approved';
+}
+
 // Pusher payload on private-staff-{staffId} → data_share.approved
 export interface DataShareApprovedEvent {
   shareRequestId: number;

@@ -17,16 +17,33 @@ import type {
 import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
 import StatCard from '../../components/common/StatCard/StatCard';
-import Meter from '../../components/common/Meter/Meter';
-import SplitBar from '../../components/common/SplitBar/SplitBar';
+import RingSplit from '../../components/common/RingSplit/RingSplit';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
 import PageHeaderSkeleton from '../../components/common/Skeleton/PageHeaderSkeleton';
 import Button from '../../components/common/Button/Button';
 import styles from './Analytics.module.scss';
 
-// Emphasis palette: one accent hue + neutral gray per split — safe by construction
-// (no categorical CVD pairing needed since gray carries no hue to confuse).
-const NEUTRAL = '#cbd5e1';
+// Emphasis palette: each ring's non-hero segment gets its own hue rather than a flat
+// gray — a gray "other" reads as an empty/broken ring once it fills most or all of the
+// circle (e.g. a 0% no-show rate leaves "Completed" as a full gray ring). Colors are
+// pulled straight from the app's theme tokens (src/styles/variables.css) so the rings
+// match the rest of the UI instead of introducing new hues; each pairing is still
+// validated with the dataviz skill's CVD checker (validate_palette.js) — danger/primary,
+// primary/warning and success/info all PASS lightness band, chroma floor, CVD separation
+// and normal-vision floor (danger/success was tried first and FAILs CVD separation, hence
+// primary standing in for "Completed" instead). The routine sub-3:1 contrast WARN is
+// mitigated by the always-visible legend labels.
+const COMPLETED_COLOR = '#0D9AFF'; // --color-primary, paired against No-Show danger '#E74C3C'
+const MANUAL_COLOR = '#F39C12'; // --color-warning, paired against App primary '#0D9AFF'
+const NEW_CLIENT_COLOR = '#3498DB'; // --color-info, paired against Returning success '#27AE60'
+
+// Revenue/services default an empty date filter to the *current month* only (unlike
+// KPIs, which default to true all-time) — per clinic.types.ts. Sending an explicit
+// Jan 1 start date pins a cleared filter to "this year to date" instead — a full year
+// of connected monthly data rather than a near-empty current-month sliver, without
+// reaching back through years of history nobody asked for (still available via the
+// date pickers for anyone who wants it).
+const YEAR_START_DATE = `${new Date().getFullYear()}-01-01`;
 
 // Categorical palette for the per-branch revenue lines — fixed order, validated
 // with the dataviz skill's CVD checker (adjacent + all-pairs both clear every
@@ -156,7 +173,9 @@ export default function AnalyticsDashboard() {
     try {
       const result = await clinicDashboardService.getRevenue(
         clinicId,
-        bothFilled ? { startDate, endDate } : {},
+        bothFilled
+          ? { startDate, endDate }
+          : { startDate: YEAR_START_DATE, endDate: new Date().toISOString().split('T')[0] },
         { signal },
       );
       setRevenue(result);
@@ -425,32 +444,26 @@ export default function AnalyticsDashboard() {
                     label="Total Appointments"
                     subLabel={kpis.period === null ? 'All time' : undefined}
                   />
-                  <Meter
-                    icon="bi-graph-down-arrow"
-                    iconBg="rgba(231,76,60,0.10)"
-                    iconColor="#e74c3c"
-                    value={kpis.noShowRate}
+                  <RingSplit
                     label="No-Show Rate"
                     subLabel={noShowSubLabel(kpis)}
+                    segments={[
+                      { label: 'No-Show', percent: kpis.noShowRate, color: '#e74c3c' },
+                      { label: 'Completed', percent: Number((100 - kpis.noShowRate).toFixed(1)), color: COMPLETED_COLOR },
+                    ]}
                   />
-                  <SplitBar
-                    icon="bi-phone"
-                    iconBg="rgba(13,154,255,0.10)"
-                    iconColor="#0d9aff"
+                  <RingSplit
                     label="App vs Manual Bookings"
                     segments={[
                       { label: 'App', percent: kpis.appointmentSources.appPercent, color: '#0d9aff' },
-                      { label: 'Manual', percent: kpis.appointmentSources.manualPercent, color: NEUTRAL },
+                      { label: 'Manual', percent: kpis.appointmentSources.manualPercent, color: MANUAL_COLOR },
                     ]}
                   />
-                  <SplitBar
-                    icon="bi-arrow-repeat"
-                    iconBg="rgba(16,185,129,0.10)"
-                    iconColor="#10b981"
+                  <RingSplit
                     label="Returning Clients"
                     segments={[
                       { label: 'Returning', percent: kpis.clientComposition.returningPercent, color: '#10b981' },
-                      { label: 'New', percent: kpis.clientComposition.newPercent, color: NEUTRAL },
+                      { label: 'New', percent: kpis.clientComposition.newPercent, color: NEW_CLIENT_COLOR },
                     ]}
                   />
                 </div>
@@ -517,7 +530,8 @@ export default function AnalyticsDashboard() {
                           name="Total Revenue"
                           stroke="#0d9aff"
                           strokeWidth={2.5}
-                          dot={false}
+                          dot={{ r: 3.5, fill: '#0d9aff', strokeWidth: 0 }}
+                          activeDot={{ r: 5, fill: '#0d9aff' }}
                         />
                       )}
                       {showPerBranch && chartView === 'byBranch' && seriesBranchIds.map((id, i) => (
@@ -528,7 +542,8 @@ export default function AnalyticsDashboard() {
                           name={branchMeta.get(id) ?? `Branch ${id}`}
                           stroke={BRANCH_COLORS[i % BRANCH_COLORS.length]}
                           strokeWidth={2}
-                          dot={false}
+                          dot={{ r: 3, fill: BRANCH_COLORS[i % BRANCH_COLORS.length], strokeWidth: 0 }}
+                          activeDot={{ r: 5, fill: BRANCH_COLORS[i % BRANCH_COLORS.length] }}
                         />
                       ))}
                       {showPerBranch && chartView === 'byBranch' && overflowBranchIds.length > 0 && (
