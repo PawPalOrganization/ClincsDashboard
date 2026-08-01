@@ -12,6 +12,7 @@ import Button from '../../components/common/Button/Button';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
 import PetDetailModal from './PetDetailModal';
 import EditAppointmentModal from './EditAppointmentModal';
+import CancelAppointmentModal from './CancelAppointmentModal';
 import styles from './Appointments.module.scss';
 
 function formatDateTime(value?: string): string {
@@ -64,6 +65,7 @@ export default function AppointmentDetail() {
   const [acting, setActing] = useState(false);
   const [petModalOpen, setPetModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   useEffect(() => {
     if (!id || !canView) return;
@@ -82,20 +84,6 @@ export default function AppointmentDetail() {
       setAppointment(updated);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to finish appointment.');
-    } finally {
-      setActing(false);
-    }
-  }
-
-  async function handleCancel() {
-    if (!id) return;
-    setActing(true);
-    setActionError('');
-    try {
-      const updated = await clinicAppointmentService.cancel(id);
-      setAppointment(updated);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to cancel appointment.');
     } finally {
       setActing(false);
     }
@@ -138,6 +126,14 @@ export default function AppointmentDetail() {
           isOpen={editModalOpen}
           onClose={() => setEditModalOpen(false)}
           onSaved={setAppointment}
+        />
+      )}
+      {appointment && (
+        <CancelAppointmentModal
+          appointmentId={appointment.id}
+          isOpen={cancelModalOpen}
+          onClose={() => setCancelModalOpen(false)}
+          onCancelled={setAppointment}
         />
       )}
       <div className={styles.pageHeader}>
@@ -354,7 +350,7 @@ export default function AppointmentDetail() {
                     <Button
                       variant="outline"
                       icon="bi-x-lg"
-                      onClick={handleCancel}
+                      onClick={() => setCancelModalOpen(true)}
                       disabled={acting}
                     >
                       Cancel Appointment

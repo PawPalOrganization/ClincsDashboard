@@ -9,6 +9,7 @@ import { honorificFor } from '../../utils/staffRoles';
 import { useClinicStaffDirectory } from '../../hooks/useClinicStaffDirectory';
 import type { Appointment, ClinicBranch } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
+import CancelAppointmentModal from './CancelAppointmentModal';
 import styles from './Appointments.module.scss';
 
 function formatTime(value?: string): string {
@@ -33,6 +34,7 @@ export default function TodayQueue() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [cancelTargetId, setCancelTargetId] = useState<string | number | null>(null);
 
   useEffect(() => {
     if (!clinicId) return;
@@ -69,18 +71,6 @@ export default function TodayQueue() {
     }
   }
 
-  async function handleCancel(id: string | number) {
-    setActionError('');
-    try {
-      await clinicAppointmentService.cancel(id);
-      setAppointments((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: 'cancelled' as const } : a)),
-      );
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to cancel appointment.');
-    }
-  }
-
   if (!clinicId) {
     return (
       <div className={styles.noClinic}>
@@ -105,6 +95,15 @@ export default function TodayQueue() {
 
   return (
     <div className={styles.page}>
+      <CancelAppointmentModal
+        appointmentId={cancelTargetId ?? ''}
+        isOpen={cancelTargetId != null}
+        onClose={() => setCancelTargetId(null)}
+        onCancelled={(updated) => {
+          setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+          setCancelTargetId(null);
+        }}
+      />
       <div className={styles.pageHeader}>
         <div>
           <h1 className={styles.pageTitle}>Today's Queue</h1>
@@ -188,7 +187,7 @@ export default function TodayQueue() {
                           <button
                             type="button"
                             className={`${styles.queueActionBtn} ${styles.cancel}`}
-                            onClick={() => handleCancel(appt.id)}
+                            onClick={() => setCancelTargetId(appt.id)}
                           >
                             <i className="bi bi-x-lg" /> Cancel
                           </button>

@@ -308,6 +308,13 @@ export interface AppointmentUser {
   phoneNumber?: string;
 }
 
+// GET /clinic/api/appointments/cancellation-reasons
+export interface AppointmentCancellationReason {
+  id: number;
+  title: string;
+  description: string;
+}
+
 export interface Appointment {
   id: string | number;
   clinicBranchId: string | number;
@@ -354,6 +361,12 @@ export interface UpdateAppointmentPayload {
   scheduledAt?: string;
   timezone?: string;
   notes?: string;
+}
+
+// POST /clinic/api/appointments/:id/cancel
+export interface CancelAppointmentPayload {
+  appointmentCancellationReasonId: number;
+  reason?: string;
 }
 
 export interface AppointmentStats {

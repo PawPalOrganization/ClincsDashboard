@@ -2,8 +2,10 @@ import clinicApi from './clinicApi';
 import type {
   ApiResponse,
   Appointment,
+  AppointmentCancellationReason,
   AppointmentListParams,
   AppointmentStats,
+  CancelAppointmentPayload,
   CreateAppointmentPayload,
   PaginatedList,
   PaginatedResponse,
@@ -78,10 +80,15 @@ const clinicAppointmentService = {
     return res.data;
   },
 
-  async cancel(id: string | number, reason?: string): Promise<Appointment> {
-    const res = await clinicApi.post<ApiResponse<Appointment>>(`/appointments/${id}/cancel`, {
-      reason,
-    });
+  async listCancellationReasons(): Promise<AppointmentCancellationReason[]> {
+    const res = await clinicApi.get<ApiResponse<AppointmentCancellationReason[]>>(
+      '/appointments/cancellation-reasons',
+    );
+    return Array.isArray(res.data) ? res.data : [];
+  },
+
+  async cancel(id: string | number, payload: CancelAppointmentPayload): Promise<Appointment> {
+    const res = await clinicApi.post<ApiResponse<Appointment>>(`/appointments/${id}/cancel`, payload);
     return res.data;
   },
 
