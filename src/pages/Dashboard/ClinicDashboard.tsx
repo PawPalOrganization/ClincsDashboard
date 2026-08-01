@@ -5,6 +5,8 @@ import clinicApi from '../../services/clinic/clinicApi';
 import clinicAppointmentService from '../../services/clinic/clinicAppointmentService';
 import clinicDashboardService from '../../services/clinic/clinicDashboardService';
 import { hasAnyClinicPermission, hasClinicPermission } from '../../utils/clinicPermissions';
+import { honorificFor } from '../../utils/staffRoles';
+import { useClinicStaffDirectory } from '../../hooks/useClinicStaffDirectory';
 import type {
   ApiResponse,
   Appointment,
@@ -127,6 +129,7 @@ function NoClinic() {
 
 export default function ClinicDashboard() {
   const { staff: authStaff, clinicId } = useClinicAuth();
+  const staffDirectory = useClinicStaffDirectory(clinicId);
 
   const canViewClinic        = hasClinicPermission(authStaff, 'clinics.read');
   const canViewBranches      = hasClinicPermission(authStaff, 'clinic-branches.read');
@@ -384,7 +387,7 @@ export default function ClinicDashboard() {
                   <div className={styles.staffName}>{patientLabel(booking)}</div>
                   <div className={styles.staffEmail}>
                     {formatTime(booking.scheduledAt)}
-                    {booking.doctor && ` · Dr. ${booking.doctor.firstName} ${booking.doctor.lastName}`}
+                    {booking.doctor && ` · ${honorificFor(staffDirectory.get(String(booking.doctor.id)) ?? booking.doctor)}${booking.doctor.firstName} ${booking.doctor.lastName}`}
                   </div>
                 </div>
                 <span className={`${styles.bookingBadge} ${styles[`booking_${booking.status}`]}`}>

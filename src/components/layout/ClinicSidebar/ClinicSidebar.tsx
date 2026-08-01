@@ -9,6 +9,7 @@ import clinicNotificationService from '../../../services/clinic/clinicNotificati
 import { useClinicPusher } from '../../../hooks/useClinicPusher';
 import NotificationToast from '../../common/NotificationToast/NotificationToast';
 import type { ToastItem } from '../../common/NotificationToast/NotificationToast';
+import { notificationTargetPath } from '../../../utils/notificationTargetPath';
 import type { ClinicNotification } from '../../../types/clinic.types';
 import styles from './ClinicSidebar.module.scss';
 
@@ -135,6 +136,21 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
     }
   }
 
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+
+  async function handleMarkAllRead() {
+    setMarkingAllRead(true);
+    try {
+      await clinicNotificationService.markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch {
+      // Silently ignore — unread notifications stay as-is; user can retry.
+    } finally {
+      setMarkingAllRead(false);
+    }
+  }
+
   // ── Tab title + favicon — side effects driven by React Query's clinic data ──
 
   useEffect(() => {
@@ -152,16 +168,6 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
       link.href = '/favicon.ico';
     };
   }, [clinic]);
-
-  function notificationTargetPath(n: ClinicNotification): string {
-    // Check the notification's own type first — a review notification can still
-    // carry an appointmentId (a review is tied to the finished appointment it came
-    // from), and that used to win, sending "new review" notifications to the
-    // appointment page instead of Reviews.
-    if (n.type?.startsWith('review_')) return '/reviews';
-    if (n.data?.appointmentId) return `/appointments/${n.data.appointmentId}`;
-    return '/appointments';
-  }
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (!item.permission) return true;
@@ -248,9 +254,21 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
           <div className={styles.notifDropdown}>
             <div className={styles.notifHeader}>
               <span>Notifications</span>
-              {unreadCount > 0 && (
-                <span className={styles.notifUnreadBadge}>{unreadCount} unread</span>
-              )}
+              <div className={styles.notifHeaderActions}>
+                {unreadCount > 0 && (
+                  <span className={styles.notifUnreadBadge}>{unreadCount} unread</span>
+                )}
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    className={styles.notifMarkAllBtn}
+                    onClick={handleMarkAllRead}
+                    disabled={markingAllRead}
+                  >
+                    {markingAllRead ? 'Marking…' : 'Mark all read'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {notifications.length === 0 ? (
@@ -283,6 +301,14 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
                 ))}
               </ul>
             )}
+
+            <button
+              type="button"
+              className={styles.notifViewAllBtn}
+              onClick={() => { setBellOpen(false); navigate('/notifications'); }}
+            >
+              View all notifications
+            </button>
           </div>
         )}
       </div>

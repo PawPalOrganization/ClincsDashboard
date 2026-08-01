@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import clinicPetService from '../../services/clinic/clinicPetService';
+import { honorificFor } from '../../utils/staffRoles';
+import { useClinicStaffDirectory } from '../../hooks/useClinicStaffDirectory';
 import type { PetProfile, PetMedicine, Appointment } from '../../types/clinic.types';
 import Modal from '../../components/common/Modal/Modal';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
@@ -41,6 +43,7 @@ function formatDateTime(value?: string): string {
 
 export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onClose }: PetDetailModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
+  const staffDirectory = useClinicStaffDirectory(clinicId);
 
   // Profile
   const [profile, setProfile] = useState<PetProfile | null>(null);
@@ -318,12 +321,16 @@ export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onCl
                       <p style={{ margin: '0 0 0.15rem', fontWeight: 600, fontSize: '0.875rem', color: '#111827' }}>
                         {formatDateTime(appt.scheduledAt)}
                       </p>
-                      {appt.doctor && (
-                        <p style={{ margin: '0 0 0.15rem', fontSize: '0.78rem', color: '#6b7280' }}>
-                          Dr. {appt.doctor.firstName} {appt.doctor.lastName}
-                          {appt.doctor.role ? ` · ${appt.doctor.role.name}` : ''}
-                        </p>
-                      )}
+                      {appt.doctor && (() => {
+                        const fullStaff = staffDirectory.get(String(appt.doctor.id));
+                        const roleName = fullStaff?.role?.name ?? appt.doctor.role?.name;
+                        return (
+                          <p style={{ margin: '0 0 0.15rem', fontSize: '0.78rem', color: '#6b7280' }}>
+                            {honorificFor(fullStaff ?? appt.doctor)}{appt.doctor.firstName} {appt.doctor.lastName}
+                            {roleName ? ` · ${roleName}` : ''}
+                          </p>
+                        );
+                      })()}
                       {(appt.services ?? []).length > 0 && (
                         <p style={{ margin: 0, fontSize: '0.75rem', color: '#9ca3af' }}>
                           {(appt.services ?? []).map((s) => s.name ?? `#${s.clinicServiceId}`).join(', ')}

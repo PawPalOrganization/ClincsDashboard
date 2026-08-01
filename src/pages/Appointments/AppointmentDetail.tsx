@@ -5,6 +5,8 @@ import clinicAppointmentService from '../../services/clinic/clinicAppointmentSer
 import { hasClinicPermission } from '../../utils/clinicPermissions';
 import { formatPatientDisplayName } from '../../utils/formatPatientDisplayName';
 import { canFinishAppointment } from '../../utils/appointmentTiming';
+import { honorificFor } from '../../utils/staffRoles';
+import { useClinicStaffDirectory } from '../../hooks/useClinicStaffDirectory';
 import type { Appointment, AppointmentStatus } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
@@ -48,6 +50,7 @@ export default function AppointmentDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const successMsg = (location.state as { successMsg?: string } | null)?.successMsg ?? '';
+  const staffDirectory = useClinicStaffDirectory(clinicId);
 
   const canView = hasClinicPermission(authStaff, 'appointments.read');
   const canUpdate = hasClinicPermission(authStaff, 'appointments.update');
@@ -226,24 +229,30 @@ export default function AppointmentDetail() {
               )}
             </div>
 
-            {/* Doctor */}
+            {/* Staff */}
             <div className={styles.detailCard}>
-              <p className={styles.detailCardTitle}>Doctor</p>
-              {appointment.doctor ? (
-                <>
-                  <div className={styles.detailRow}>
-                    <label>Name</label>
-                    <span>Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}</span>
-                  </div>
-                  {appointment.doctor.role && (
+              <p className={styles.detailCardTitle}>Staff</p>
+              {appointment.doctor ? (() => {
+                // The appointment's embedded doctor often lacks role — resolve against
+                // the full staff directory for an accurate honorific/role instead of guessing.
+                const fullStaff = staffDirectory.get(String(appointment.doctor.id));
+                const roleName = fullStaff?.role?.name ?? appointment.doctor.role?.name;
+                return (
+                  <>
                     <div className={styles.detailRow}>
-                      <label>Specialty</label>
-                      <span>{appointment.doctor.role.name}</span>
+                      <label>Name</label>
+                      <span>{honorificFor(fullStaff ?? appointment.doctor)}{appointment.doctor.firstName} {appointment.doctor.lastName}</span>
                     </div>
-                  )}
-                </>
-              ) : (
-                <span className={styles.noData}>No doctor assigned</span>
+                    {roleName && (
+                      <div className={styles.detailRow}>
+                        <label>Role</label>
+                        <span>{roleName}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })() : (
+                <span className={styles.noData}>No staff assigned</span>
               )}
             </div>
 

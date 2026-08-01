@@ -4,6 +4,7 @@ import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
 import { hasAnyClinicPermission, hasClinicPermission } from '../../utils/clinicPermissions';
+import { isDoctorRoleName } from '../../utils/staffRoles';
 import type { ClinicBranch, ClinicStaff } from '../../types/clinic.types';
 import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
@@ -21,14 +22,6 @@ const STAFF_TABS = [
   { label: 'Staff', to: '/staff' },
   { label: 'Doctors', to: '/staff/doctors' },
 ];
-
-const DOCTOR_ROLE_KEYWORDS = ['doctor', 'vet', 'physician', 'surgeon', 'specialist'];
-
-function isDoctorRole(roleName?: string): boolean {
-  if (!roleName) return false;
-  const lower = roleName.toLowerCase();
-  return DOCTOR_ROLE_KEYWORDS.some((kw) => lower.includes(kw));
-}
 
 function formatDate(value?: string): string {
   if (!value) return '';
@@ -128,7 +121,7 @@ export default function DoctorList() {
       });
 
       const doctors = (result.items as StaffRow[]).filter((s) =>
-        isDoctorRole(s.role?.name ?? undefined),
+        isDoctorRoleName(s.role?.name ?? undefined),
       );
 
       setStaff(doctors);

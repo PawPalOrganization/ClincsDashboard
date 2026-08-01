@@ -10,6 +10,7 @@ import clinicPetTypesService from '../../services/clinic/clinicPetTypesService';
 import clinicStaffService from '../../services/clinic/clinicStaffService';
 import clinicUserSearchService from '../../services/clinic/clinicUserSearchService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
+import { honorificFor, isDoctorStaff } from '../../utils/staffRoles';
 import {
   clearAppointmentDraft,
   isDraftEmpty,
@@ -32,10 +33,7 @@ import styles from './Appointments.module.scss';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const DOCTOR_KEYWORDS = ['doctor', 'vet', 'physician', 'surgeon', 'specialist'];
-function isDoctor(s: ClinicStaff) {
-  return DOCTOR_KEYWORDS.some((kw) => s.role?.name?.toLowerCase().includes(kw));
-}
+const isDoctor = isDoctorStaff;
 
 function generateSlots(start: string, end: string, step = 30): string[] {
   const slots: string[] = [];
@@ -174,10 +172,15 @@ export default function CreateAppointment() {
   const [branches, setBranches] = useState<ClinicBranch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
+  // Which half of the branch roster step 2 offers — doctors/vets, or everyone else
+  // (groomers and any other non-clinical role). Kept as an explicit choice rather than
+  // one merged list so "Dr." labeling downstream stays correct for whichever half is shown.
+  const [bookingType, setBookingType] = useState<'doctor' | 'other'>('doctor');
 
   // Step 2
   const [selectedBranchDetail, setSelectedBranchDetail] = useState<ClinicBranch | null>(null);
-  const [doctors, setDoctors] = useState<ClinicStaff[]>([]);
+  // Full, unfiltered branch roster — `doctors` (below) derives the half bookingType asks for.
+  const [staffPool, setStaffPool] = useState<ClinicStaff[]>([]);
   const [loadingDoctors, setLoadingDoctors] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState('');
   const [selectedSlot, setSelectedSlot] = useState('');
@@ -242,7 +245,13 @@ export default function CreateAppointment() {
   // clock; an approximate "N min ago" at detection time is all the banner needs.
   const [pendingDraftMinutesAgo, setPendingDraftMinutesAgo] = useState(0);
   const [draftReady, setDraftReady] = useState(false);
-  const [isRestoringDraft, setIsRestoringDraft] = useState(false);
+  // A ref, not state: the three reset-guard effects below need to read whether a
+  // restore is in progress WITHOUT re-running every time that flag itself changes —
+  // if it were state in their dependency arrays, flipping it back off after the
+  // restore would re-trigger those same effects with the guard now open, wiping the
+  // very selection they were just told to preserve (this was FE_02 — a resumed
+  // doctor/time/manual-time selection getting silently cleared right after resume).
+  const isRestoringDraftRef = useRef(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   // Lookup map: clinicServiceId → name from catalog
@@ -253,6 +262,7 @@ export default function CreateAppointment() {
   // for the branch, so we must NOT fall back to the full platform catalog here.
   const validServices = normalizeBranchServices(selectedBranchDetail?.services);
 
+  const doctors = staffPool.filter((s) => (bookingType === 'doctor' ? isDoctor(s) : !isDoctor(s)));
   const doctorObj = doctors.find((d) => String(d.id) === selectedDoctor);
   const finalTime = selectedSlot || manualTimes[selectedDoctor] || '';
 
@@ -273,16 +283,16 @@ export default function CreateAppointment() {
   // single effect (not split into a render-time adjustment) since the reset and the
   // fetch it guards must stay atomic for booking correctness, and this path has no
   // test coverage to safety-net a restructure. The reset is skipped while a saved
-  // draft is being restored (isRestoringDraft) — otherwise this effect would wipe
+  // draft is being restored (isRestoringDraftRef) — otherwise this effect would wipe
   // the very doctor/slot/service selections the draft just set, since restoring
   // `selectedBranch` from '' is a real dependency change like any other. The
   // fetches still run either way — a fresh doctors list/branch detail is needed
   // regardless of how selectedBranch was set.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (!selectedBranch || !clinicId) { setDoctors([]); setSelectedBranchDetail(null); return; }
+    if (!selectedBranch || !clinicId) { setStaffPool([]); setSelectedBranchDetail(null); return; }
     setLoadingDoctors(true);
-    if (!isRestoringDraft) {
+    if (!isRestoringDraftRef.current) {
       setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
       setSelectedServiceIds(new Set());
     }
@@ -290,27 +300,37 @@ export default function CreateAppointment() {
       .then((b) => setSelectedBranchDetail(b))
       .catch(() => setSelectedBranchDetail(null));
     clinicStaffService.list({ page: 1, limit: 100, clinicBranchId: selectedBranch })
-      .then((r) => setDoctors(r.items.filter(isDoctor)))
+      .then((r) => setStaffPool(r.items))
       .catch(() => {})
       .finally(() => setLoadingDoctors(false));
-  }, [selectedBranch, clinicId, isRestoringDraft]);
+  }, [selectedBranch, clinicId]);
+
+  // Switching between "Doctor / Vet" and "Other Staff" swaps which half of staffPool
+  // step 2 shows — clear any selection made under the other half so a stale, now-hidden
+  // staff id can't linger into submission. Skipped while restoring a draft, same reason
+  // as the branch-change effect above: handleResumeDraft sets bookingType and
+  // selectedDoctor together, and this effect would otherwise wipe the restored selection.
+  useEffect(() => {
+    if (isRestoringDraftRef.current) return;
+    setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
+  }, [bookingType]);
 
   // Reset doctor/slot when date changes — also skipped while restoring a draft, for
   // the same reason as the branch effect above.
   useEffect(() => {
-    if (isRestoringDraft) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isRestoringDraftRef.current) return;
     setSelectedDoctor(''); setSelectedSlot(''); setManualTimes({});
-  }, [selectedDate, isRestoringDraft]);
+  }, [selectedDate]);
 
-  // Turns `isRestoringDraft` back off after the render where the two effects above
-  // have had a chance to see it as true and skip their resets. Must stay declared
-  // after both of them — React runs a commit's effects in declaration order, so
-  // this only flips the flag back once they've already read it.
+  // Clears the restore flag once the three guarded effects above have run for this
+  // commit and had a chance to read it as true — runs after every commit (no
+  // dependency array) rather than being keyed off the flag's own value, precisely so
+  // that clearing it does NOT itself count as a dependency change that re-triggers
+  // those effects (a ref mutation triggers nothing on its own; this effect is what
+  // would, if it were state-driven, which is exactly the bug this replaced).
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (isRestoringDraft) setIsRestoringDraft(false);
-  }, [isRestoringDraft]);
+    isRestoringDraftRef.current = false;
+  });
 
   // Look for a resumable draft once, on mount — surfaced via the resume banner
   // rather than applied automatically (see handleResumeDraft), so a different staff
@@ -335,7 +355,7 @@ export default function CreateAppointment() {
     if (!draftReady || !clinicId || !authStaff) return;
     const draft: AppointmentDraft = {
       savedAt: Date.now(),
-      step, selectedBranch, selectedDate, selectedDoctor, selectedSlot, manualTimes,
+      step, selectedBranch, selectedDate, bookingType, selectedDoctor, selectedSlot, manualTimes,
       lookupMethod, lookupValue, consentPhase, pendingUserId, foundIdentifier,
       approvedUser, selectedPetId,
       selectedServiceIds: Array.from(selectedServiceIds), notes,
@@ -343,7 +363,7 @@ export default function CreateAppointment() {
     if (isDraftEmpty(draft)) { clearAppointmentDraft(clinicId, authStaff.id); return; }
     writeAppointmentDraft(clinicId, authStaff.id, draft);
   }, [
-    draftReady, clinicId, authStaff, step, selectedBranch, selectedDate, selectedDoctor,
+    draftReady, clinicId, authStaff, step, selectedBranch, selectedDate, bookingType, selectedDoctor,
     selectedSlot, manualTimes, lookupMethod, lookupValue, consentPhase,
     pendingUserId, foundIdentifier, approvedUser, selectedPetId,
     selectedServiceIds, notes,
@@ -671,10 +691,13 @@ export default function CreateAppointment() {
 
   function handleResumeDraft() {
     if (!pendingDraft || !clinicId) return;
-    setIsRestoringDraft(true);
+    isRestoringDraftRef.current = true;
     setStep(pendingDraft.step);
     setSelectedBranch(pendingDraft.selectedBranch);
     setSelectedDate(pendingDraft.selectedDate);
+    // Drafts saved before the doctor/other-staff toggle existed have no bookingType —
+    // default those to 'doctor' so they resume into the same behavior they were saved with.
+    setBookingType(pendingDraft.bookingType ?? 'doctor');
     setSelectedDoctor(pendingDraft.selectedDoctor);
     setSelectedSlot(pendingDraft.selectedSlot);
     setManualTimes(pendingDraft.manualTimes);
@@ -910,6 +933,25 @@ export default function CreateAppointment() {
                   onChange={(e) => setSelectedDate(e.target.value)}
                 />
               </div>
+              <div>
+                <label className={styles.fieldLabel}>What kind of appointment?</label>
+                <div style={{ display: 'flex', gap: '0.375rem' }}>
+                  <button
+                    type="button"
+                    className={`${styles.slotBtn} ${bookingType === 'doctor' ? styles.slotBtnSelected : ''}`}
+                    onClick={() => setBookingType('doctor')}
+                  >
+                    Doctor / Vet Visit
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.slotBtn} ${bookingType === 'other' ? styles.slotBtnSelected : ''}`}
+                    onClick={() => setBookingType('other')}
+                  >
+                    Other Service (Groomer, etc.)
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -918,7 +960,7 @@ export default function CreateAppointment() {
         {step === 2 && (
           <div className={styles.stepCard}>
             <p className={styles.stepCardTitle}>
-              Available doctors —{' '}
+              {bookingType === 'doctor' ? 'Available doctors' : 'Available staff'} —{' '}
               {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-GB', {
                 weekday: 'long', day: 'numeric', month: 'long',
               })}
@@ -926,13 +968,16 @@ export default function CreateAppointment() {
 
             {loadingDoctors && (
               <p style={{ color: '#9ca3af', fontSize: '0.875rem', margin: 0 }}>
-                <i className="bi bi-hourglass-split" /> Loading doctors…
+                <i className="bi bi-hourglass-split" /> {bookingType === 'doctor' ? 'Loading doctors…' : 'Loading staff…'}
               </p>
             )}
 
             {!loadingDoctors && doctors.length === 0 && (
               <div className="alert alert-info py-2" style={{ fontSize: '0.875rem' }}>
-                <i className="bi bi-info-circle" /> No doctors found for this branch.
+                <i className="bi bi-info-circle" />{' '}
+                {bookingType === 'doctor'
+                  ? 'No doctors found for this branch.'
+                  : 'No other staff found for this branch.'}
               </div>
             )}
 
@@ -964,7 +1009,7 @@ export default function CreateAppointment() {
                             : <>{doc.firstName[0]}{doc.lastName[0]}</>}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className={styles.doctorName}>Dr. {doc.firstName} {doc.lastName}</div>
+                          <div className={styles.doctorName}>{honorificFor(doc)}{doc.firstName} {doc.lastName}</div>
                           {doc.role && <div className={styles.doctorRole}>{doc.role.name}</div>}
                         </div>
                         {isSelected && finalTime && (
@@ -1439,7 +1484,7 @@ export default function CreateAppointment() {
               </div>
               <div className={styles.summaryRow}>
                 <i className="bi bi-person-badge" />
-                <span>Dr. {doctorObj?.firstName} {doctorObj?.lastName}{doctorObj?.role ? ` — ${doctorObj.role.name}` : ''}</span>
+                <span>{honorificFor(doctorObj)}{doctorObj?.firstName} {doctorObj?.lastName}{doctorObj?.role ? ` — ${doctorObj.role.name}` : ''}</span>
               </div>
               {approvedUser && (
                 <div className={styles.summaryRow}>

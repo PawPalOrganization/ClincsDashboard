@@ -5,6 +5,8 @@ import clinicAppointmentService from '../../services/clinic/clinicAppointmentSer
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
 import { canFinishAppointment } from '../../utils/appointmentTiming';
+import { honorificFor } from '../../utils/staffRoles';
+import { useClinicStaffDirectory } from '../../hooks/useClinicStaffDirectory';
 import type { Appointment, ClinicBranch } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import styles from './Appointments.module.scss';
@@ -19,6 +21,7 @@ function formatTime(value?: string): string {
 export default function TodayQueue() {
   const { clinicId, staff: authStaff } = useClinicAuth();
   const navigate = useNavigate();
+  const staffDirectory = useClinicStaffDirectory(clinicId);
 
   const canView = hasClinicPermission(authStaff, 'appointments.read');
   const canUpdate = hasClinicPermission(authStaff, 'appointments.update');
@@ -164,7 +167,7 @@ export default function TodayQueue() {
                       <strong>{appt.contactName ?? `User #${appt.userId ?? '?'}`}</strong>
                       <span>
                         {formatTime(appt.scheduledAt)}
-                        {appt.doctor && ` · Dr. ${appt.doctor.firstName} ${appt.doctor.lastName}`}
+                        {appt.doctor && ` · ${honorificFor(staffDirectory.get(String(appt.doctor.id)) ?? appt.doctor)}${appt.doctor.firstName} ${appt.doctor.lastName}`}
                         {appt.services.length > 0 && ` · ${appt.services.map((s) => s.name ?? `#${s.clinicServiceId}`).join(', ')}`}
                       </span>
                     </div>

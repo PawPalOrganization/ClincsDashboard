@@ -200,6 +200,12 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.notifHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .notifUnreadBadge {
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
@@ -207,6 +213,35 @@
   font-weight: 500;
   padding: 0.1rem 0.45rem;
   border-radius: 10px;
+}
+
+.notifMarkAllBtn {
+  background: none;
+  border: none;
+  color: #4db5ff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+
+  &:hover { color: #ffffff; }
+  &:disabled { color: #6b7280; cursor: default; }
+}
+
+.notifViewAllBtn {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  color: #4db5ff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0.6rem 0.875rem;
+  cursor: pointer;
+
+  &:hover { background: rgba(255, 255, 255, 0.04); }
 }
 
 .notifEmpty {

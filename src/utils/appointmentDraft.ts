@@ -5,6 +5,7 @@ export interface AppointmentDraft {
   step: 1 | 2 | 3 | 4;
   selectedBranch: string;
   selectedDate: string;
+  bookingType: 'doctor' | 'other';
   selectedDoctor: string;
   selectedSlot: string;
   manualTimes: Record<string, string>;

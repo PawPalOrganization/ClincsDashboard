@@ -4,10 +4,13 @@ import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicPatientsService from '../../services/clinic/clinicPatientsService';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
+import { honorificFor } from '../../utils/staffRoles';
+import { useClinicStaffDirectory } from '../../hooks/useClinicStaffDirectory';
 import type {
   Appointment,
   AppointmentStatus,
   ClinicBranch,
+  ClinicStaff,
   PatientClinicProfile,
 } from '../../types/clinic.types';
 import type { Column } from '../../components/common/DataTable/DataTable';
@@ -35,15 +38,19 @@ function formatDateTime(value?: string): string {
     : d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function AppointmentRow({ appt }: { appt: Appointment }) {
+function AppointmentRow({ appt, staffDirectory }: { appt: Appointment; staffDirectory: Map<string, ClinicStaff> }) {
+  // The appointment's embedded doctor often lacks role — resolve against the full
+  // staff directory for an accurate honorific/role instead of guessing.
+  const fullStaff = appt.doctor ? staffDirectory.get(String(appt.doctor.id)) : undefined;
+  const roleName = fullStaff?.role?.name ?? appt.doctor?.role?.name;
   return (
     <div className={styles.appointmentRow}>
       <div>
         <p className={styles.appointmentRowDate}>{formatDateTime(appt.scheduledAt)}</p>
         {appt.doctor && (
           <p className={styles.appointmentRowDoctor}>
-            Dr. {appt.doctor.firstName} {appt.doctor.lastName}
-            {appt.doctor.role ? ` · ${appt.doctor.role.name}` : ''}
+            {honorificFor(fullStaff ?? appt.doctor)}{appt.doctor.firstName} {appt.doctor.lastName}
+            {roleName ? ` · ${roleName}` : ''}
           </p>
         )}
         {appt.services.length > 0 && (
@@ -63,6 +70,7 @@ export default function PatientProfile() {
   const { userId } = useParams<{ userId: string }>();
   const { clinicId, staff: authStaff } = useClinicAuth();
   const navigate = useNavigate();
+  const staffDirectory = useClinicStaffDirectory(clinicId);
 
   const canView = hasClinicPermission(authStaff, 'users.read');
 
@@ -142,11 +150,11 @@ export default function PatientProfile() {
     },
     {
       key: 'doctor',
-      label: 'Doctor',
+      label: 'Staff',
       width: '180px',
       render: (row) =>
         row.doctor
-          ? <span className={styles.cellText}>Dr. {row.doctor.firstName} {row.doctor.lastName}</span>
+          ? <span className={styles.cellText}>{honorificFor(staffDirectory.get(String(row.doctor.id)) ?? row.doctor)}{row.doctor.firstName} {row.doctor.lastName}</span>
           : <span className={styles.noData}>—</span>,
     },
     {
@@ -313,7 +321,7 @@ export default function PatientProfile() {
             ) : (
               <div className={styles.appointmentRowList}>
                 {profile.recentAppointments.map((appt) => (
-                  <AppointmentRow key={appt.id} appt={appt} />
+                  <AppointmentRow key={appt.id} appt={appt} staffDirectory={staffDirectory} />
                 ))}
               </div>
             )}

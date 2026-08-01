@@ -30,6 +30,7 @@ const ServicesList       = lazy(() => import('./pages/Services/ServicesList'));
 const PatientsList       = lazy(() => import('./pages/Patients/PatientsList'));
 const PatientProfile     = lazy(() => import('./pages/Patients/PatientProfile'));
 const ReviewsList        = lazy(() => import('./pages/Reviews/ReviewsList'));
+const NotificationsList  = lazy(() => import('./pages/Notifications/NotificationsList'));
 
 // ─── Root redirect ─────────────────────────────────────────────────────────
 // Reads auth state and sends the user to the right place.
@@ -124,6 +125,7 @@ export default function App() {
                 <Route path="/patients"            element={<PatientsList />} />
                 <Route path="/patients/:userId"    element={<PatientProfile />} />
                 <Route path="/reviews"             element={<ReviewsList />} />
+                <Route path="/notifications"       element={<NotificationsList />} />
                 <Route path="/settings"            element={<ClinicSettings />} />
               </Route>
             </Route>

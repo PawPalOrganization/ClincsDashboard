@@ -5,6 +5,8 @@ import clinicAppointmentService from '../../services/clinic/clinicAppointmentSer
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
 import { formatPatientDisplayName } from '../../utils/formatPatientDisplayName';
+import { honorificFor } from '../../utils/staffRoles';
+import { useClinicStaffDirectory } from '../../hooks/useClinicStaffDirectory';
 import type {
   Appointment,
   AppointmentStatus,
@@ -57,6 +59,7 @@ function StatusBadge({ status }: { status: AppointmentStatus }) {
 export default function AppointmentsList() {
   const { clinicId, staff: authStaff } = useClinicAuth();
   const navigate = useNavigate();
+  const staffDirectory = useClinicStaffDirectory(clinicId);
 
   const canView = hasClinicPermission(authStaff, 'appointments.read');
   const canCreate = hasClinicPermission(authStaff, 'appointments.create');
@@ -151,17 +154,21 @@ export default function AppointmentsList() {
     },
     {
       key: 'doctor',
-      label: 'Doctor',
+      label: 'Staff',
       width: '180px',
-      render: (row) =>
-        row.doctor ? (
+      render: (row) => {
+        if (!row.doctor) return <span className={styles.noData}>—</span>;
+        // The appointment's embedded doctor often lacks role — resolve against the
+        // full staff directory for an accurate honorific/role instead of guessing.
+        const fullStaff = staffDirectory.get(String(row.doctor.id));
+        const roleName = fullStaff?.role?.name ?? row.doctor.role?.name;
+        return (
           <div className={styles.doctorCell}>
-            <span>Dr. {row.doctor.firstName} {row.doctor.lastName}</span>
-            {row.doctor.role && <small>{row.doctor.role.name}</small>}
+            <span>{honorificFor(fullStaff ?? row.doctor)}{row.doctor.firstName} {row.doctor.lastName}</span>
+            {roleName && <small>{roleName}</small>}
           </div>
-        ) : (
-          <span className={styles.noData}>—</span>
-        ),
+        );
+      },
     },
     {
       key: 'services',
