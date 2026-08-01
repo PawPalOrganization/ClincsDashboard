@@ -46,6 +46,15 @@ const clinicAuthService = {
     return { token, staff, clinicId, branchId };
   },
 
+  /**
+   * Overwrites just the cached staff record — used after an action that changes the
+   * logged-in staff's own data mid-session (e.g. self-assigning to a branch they just
+   * created) so the UI reflects it immediately instead of only after the next login.
+   */
+  updateStoredStaff(staff: ClinicStaff): void {
+    localStorage.setItem(STAFF_KEY, JSON.stringify(staff));
+  },
+
   /** Removes all clinic session keys from localStorage. */
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);

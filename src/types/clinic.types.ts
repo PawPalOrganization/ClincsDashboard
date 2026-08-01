@@ -347,6 +347,7 @@ export interface CreateAppointmentPayload {
 export interface UpdateAppointmentPayload {
   clinicStaffId?: string | number;
   clinicServiceIds?: Array<string | number>;
+  petId?: string | number;
   contactName?: string;
   contactPhone?: string;
   contactAddress?: string;

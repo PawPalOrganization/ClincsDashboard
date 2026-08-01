@@ -12,6 +12,13 @@ import clinicUserSearchService from '../../services/clinic/clinicUserSearchServi
 import { hasClinicPermission } from '../../utils/clinicPermissions';
 import { honorificFor, isDoctorStaff } from '../../utils/staffRoles';
 import {
+  fmt,
+  getBranchHoursForDate,
+  getSlotsForDate,
+  isTimeWithinBranchHours,
+  normalizeBranchServices,
+} from '../../utils/appointmentSlots';
+import {
   clearAppointmentDraft,
   isDraftEmpty,
   readAppointmentDraft,
@@ -19,7 +26,6 @@ import {
 } from '../../utils/appointmentDraft';
 import type { AppointmentDraft } from '../../utils/appointmentDraft';
 import type {
-  BranchWorkingHour,
   ClinicBranch,
   ClinicService,
   ClinicStaff,
@@ -35,117 +41,12 @@ import styles from './Appointments.module.scss';
 
 const isDoctor = isDoctorStaff;
 
-function generateSlots(start: string, end: string, step = 30): string[] {
-  const slots: string[] = [];
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  let cur = sh * 60 + sm;
-  const endMin = eh * 60 + em;
-  while (cur < endMin) {
-    slots.push(`${String(Math.floor(cur / 60)).padStart(2, '0')}:${String(cur % 60).padStart(2, '0')}`);
-    cur += step;
-  }
-  return slots;
-}
-
-function toMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number);
-  return h * 60 + m;
-}
-
-function fromMinutes(total: number): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
-}
-
-// null  = no workingHours data on this staff object → show manual time input
-// []    = doctor (or the branch) is off this day, or their hours don't overlap at all
-// [...] = available time slots, clamped to the branch's hours when the branch has any
-//         configured (matches the backend's now-authoritative "staff hours intersected
-//         with branch hours" rule — booking outside this window gets rejected server-side)
-function getSlotsForDate(doctor: ClinicStaff, date: string, branchHours?: BranchWorkingHour[]): string[] | null {
-  if (!doctor.workingHours?.length) return null;
-  const dow = new Date(date + 'T12:00:00').getDay();
-  const wh = doctor.workingHours.find((h: BranchWorkingHour) => h.dayOfWeek === dow);
-  if (!wh) return [];
-
-  // A branch with no hours configured at all imposes no constraint — same as the
-  // backend's assertWithinBranchWorkingHours, which skips enforcement in that case.
-  if (!branchHours?.length) return generateSlots(wh.startTime, wh.endTime);
-
-  const branchWh = branchHours.find((h) => h.dayOfWeek === dow);
-  if (!branchWh) return []; // branch has hours configured but is closed this day
-
-  const start = Math.max(toMinutes(wh.startTime), toMinutes(branchWh.startTime));
-  const end = Math.min(toMinutes(wh.endTime), toMinutes(branchWh.endTime));
-  if (start >= end) return [];
-  return generateSlots(fromMinutes(start), fromMinutes(end));
-}
-
-// null    = branch has no hours configured at all → no constraint to apply
-// 'closed' = branch has hours configured, but not for this day
-// [entry]  = the branch's open/close window for this day
-function getBranchHoursForDate(
-  branchHours: BranchWorkingHour[] | undefined,
-  date: string,
-): BranchWorkingHour | 'closed' | null {
-  if (!branchHours?.length) return null;
-  const dow = new Date(date + 'T12:00:00').getDay();
-  return branchHours.find((h) => h.dayOfWeek === dow) ?? 'closed';
-}
-
-// Used for the manual time-entry fallback (a doctor with no workingHours data at all),
-// which — unlike the generated slot buttons — isn't already clamped to branch hours by
-// construction. Lets the picker itself reject an out-of-range time instead of only
-// finding out via a 400 at submit.
-function isTimeWithinBranchHours(time: string, branchDayHours: BranchWorkingHour | 'closed' | null): boolean {
-  if (!branchDayHours) return true;
-  if (branchDayHours === 'closed') return false;
-  const t = toMinutes(time);
-  return t >= toMinutes(branchDayHours.startTime) && t < toMinutes(branchDayHours.endTime);
-}
-
 // Egyptian mobile local part is always 10 digits after the country code (e.g.
 // "1012345678" in +201012345678 / 01012345678) — take the last 10 digits regardless
 // of which prefix format the source string used. Also used as the phone input's
 // onChange filter, so pasted text in any format reduces to the right digits.
 function egyptLocalDigits(raw: string): string {
   return raw.replace(/\D/g, '').slice(-10);
-}
-
-function fmt(time: string): string {
-  if (!time) return '';
-  const [h, m] = time.split(':').map(Number);
-  return `${h > 12 ? h - 12 : h === 0 ? 12 : h}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-}
-
-interface NormalizedBranchService {
-  clinicServiceId: number;
-  cost: number;
-  name?: string;
-}
-
-// The branch-detail GET returns `services` as full ClinicService-like objects
-// ({ id, name, cost, ... }) — `id` IS the clinic service id here, not `clinicServiceId`
-// (that field name only applies to the create/update payload shape). Same normalization
-// BranchForm.tsx already has to apply for the same reason.
-function normalizeBranchServices(rawServices?: ClinicBranch['services']): NormalizedBranchService[] {
-  if (!Array.isArray(rawServices) || rawServices.length === 0) return [];
-  return (rawServices as unknown[])
-    .map((raw): NormalizedBranchService | null => {
-      const s = raw as Record<string, unknown>;
-      const nestedClinicService = s.clinicService as Record<string, unknown> | undefined;
-      const nestedService = s.service as Record<string, unknown> | undefined;
-      const id = s.clinicServiceId ?? s.serviceId ?? nestedClinicService?.id ?? nestedService?.id ?? s.id;
-      if (id == null || Number(id as number | string) <= 0) return null;
-      const name = (s.name ?? nestedClinicService?.name ?? nestedService?.name ?? undefined) as string | undefined;
-      return {
-        clinicServiceId: Number(id as number | string),
-        cost: s.cost != null ? Number(s.cost as number | string) : 0,
-        name,
-      };
-    })
-    .filter((row): row is NormalizedBranchService => row !== null);
 }
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -790,7 +691,7 @@ export default function CreateAppointment() {
         return;
       }
     }
-    const serviceIds = Array.from(selectedServiceIds).filter((id) => id > 0);
+    const serviceIds = Array.from(selectedServiceIds).filter((id) => Number.isInteger(id) && id > 0);
     if (!serviceIds.length) { setServerError('Select at least one service.'); return; }
     if (!isPatientStepValid()) {
       setServerError('Select a pet for this patient before booking — consent status may have changed, go back to the Patient step.');

@@ -11,6 +11,7 @@ import type { Appointment, AppointmentStatus } from '../../types/clinic.types';
 import Button from '../../components/common/Button/Button';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
 import PetDetailModal from './PetDetailModal';
+import EditAppointmentModal from './EditAppointmentModal';
 import styles from './Appointments.module.scss';
 
 function formatDateTime(value?: string): string {
@@ -62,6 +63,7 @@ export default function AppointmentDetail() {
   const [actionError, setActionError] = useState('');
   const [acting, setActing] = useState(false);
   const [petModalOpen, setPetModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   useEffect(() => {
     if (!id || !canView) return;
@@ -127,6 +129,15 @@ export default function AppointmentDetail() {
           branchId={String(appointment.clinicBranchId)}
           isOpen={petModalOpen}
           onClose={() => setPetModalOpen(false)}
+        />
+      )}
+      {appointment && clinicId && (
+        <EditAppointmentModal
+          appointment={appointment}
+          clinicId={clinicId}
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          onSaved={setAppointment}
         />
       )}
       <div className={styles.pageHeader}>
@@ -318,6 +329,16 @@ export default function AppointmentDetail() {
             return (
               <>
                 <div className={styles.detailActions}>
+                  {canUpdate && (
+                    <Button
+                      variant="outline"
+                      icon="bi-pencil"
+                      onClick={() => setEditModalOpen(true)}
+                      disabled={acting}
+                    >
+                      Edit
+                    </Button>
+                  )}
                   {canUpdate && (
                     <Button
                       variant="primary"

@@ -166,7 +166,12 @@ export default function ClinicDashboard() {
     Promise.allSettled([
       canViewClinic      ? clinicApi.get<ApiResponse<Clinic>>(`/clinics/${clinicId}`) : SKIP,
       canViewBranches    ? clinicApi.get<ApiResponse<{ items: unknown[]; meta: { total: number } } | unknown[]>>(`/clinics/${clinicId}/branches`) : SKIP,
-      canViewStaff       ? clinicApi.get<{ data: { meta?: { total: number }; items?: ClinicStaff[] } | ClinicStaff[] }>('/clinic-staff', { page: 1, limit: 1 }) : SKIP,
+      // limit was 1 — when the backend answers with a bare array instead of the
+      // {items, meta} shape, the count fell back to raw.length, which a limit of 1
+      // hard-caps at 1 regardless of the clinic's actual staff count. A generous limit
+      // keeps that fallback accurate for any realistic clinic size; meta.total (when
+      // present) is unaffected by the limit either way.
+      canViewStaff       ? clinicApi.get<{ data: { meta?: { total: number }; items?: ClinicStaff[] } | ClinicStaff[] }>('/clinic-staff', { page: 1, limit: 200 }) : SKIP,
       canViewOverviewKpis ? clinicDashboardService.getKpis(clinicId) : SKIP,
     ]).then(([clinicRes, branchesRes, staffRes, kpisRes]) => {
       const nextErrors: typeof errors = {};

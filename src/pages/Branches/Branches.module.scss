@@ -547,6 +547,15 @@
   background: #fffbeb;
 }
 
+.serviceCostError {
+  border-color: #e74c3c !important;
+  background: #fef2f2;
+
+  &:focus {
+    box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.15);
+  }
+}
+
 .catalogErrorBox {
   display: flex;
   align-items: center;

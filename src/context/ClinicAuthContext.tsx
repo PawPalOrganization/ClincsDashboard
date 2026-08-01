@@ -19,6 +19,8 @@ interface ClinicAuthState {
 interface ClinicAuthContextValue extends ClinicAuthState {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** Refreshes the cached staff record (e.g. after self-assigning to a new branch) without a full re-login. */
+  updateStaff: (staff: ClinicStaff) => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -90,8 +92,13 @@ export function ClinicAuthProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  function updateStaff(staff: ClinicStaff): void {
+    clinicAuthService.updateStoredStaff(staff);
+    setState((prev) => ({ ...prev, staff }));
+  }
+
   return (
-    <ClinicAuthContext.Provider value={{ ...state, login, logout }}>
+    <ClinicAuthContext.Provider value={{ ...state, login, logout, updateStaff }}>
       {children}
     </ClinicAuthContext.Provider>
   );

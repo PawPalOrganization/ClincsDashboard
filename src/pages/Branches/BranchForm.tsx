@@ -160,6 +160,11 @@ export default function BranchForm({
   const [hours, setHours]             = useState<HourEntry[]>(() => buildDefaultHours(defaultValues?.workingHours));
 
   const [titleError, setTitleError] = useState('');
+  const [serviceCostError, setServiceCostError] = useState('');
+  // Only escalates an unfilled cost to the hard red error style after a submit attempt
+  // has actually failed on it — otherwise every freshly-checked service would show as
+  // an error before the user has had a chance to type anything.
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   function commitTag() {
     const value = tagInput.trim().replace(/,+$/, '').trim();
@@ -210,6 +215,18 @@ export default function BranchForm({
       setTitleError('');
     }
 
+    // A blank or zero cost was silently defaulting to 0 (free) below — every selected
+    // service must have an actual positive price before the branch can be saved.
+    const selectedServices = services.filter((s) => s.clinicServiceId.trim() !== '');
+    const hasMissingCost = selectedServices.some((s) => !(parseFloat(s.cost) > 0));
+    setSubmitAttempted(true);
+    if (hasMissingCost) {
+      setServiceCostError('Enter a cost greater than 0 for every selected service.');
+      valid = false;
+    } else {
+      setServiceCostError('');
+    }
+
     if (!valid) return;
 
     const workingHours: BranchWorkingHour[] = hours
@@ -218,12 +235,10 @@ export default function BranchForm({
 
     const committedTags = tagInput.trim() ? [...tags, tagInput.trim()] : tags;
 
-    const builtServices: BranchService[] = services
-      .filter((s) => s.clinicServiceId.trim() !== '')
-      .map((s) => ({
-        clinicServiceId: parseInt(s.clinicServiceId, 10),
-        cost: parseFloat(s.cost) || 0,
-      }));
+    const builtServices: BranchService[] = selectedServices.map((s) => ({
+      clinicServiceId: parseInt(s.clinicServiceId, 10),
+      cost: parseFloat(s.cost),
+    }));
 
     const shared: UpdateBranchPayload = {
       title: title.trim(),
@@ -548,27 +563,42 @@ export default function BranchForm({
                         {svc.isPlatform && <span className={styles.catalogPlatformBadge}>Platform</span>}
                       </span>
                     </label>
-                    {isSelected && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '0.8rem', color: '#6b7280', whiteSpace: 'nowrap' }}>EGP</span>
-                        <input
-                          type="number"
-                          className={`${styles.serviceCostInput} ${services[existingIdx]?.cost === '' || services[existingIdx]?.cost === '0' ? styles.serviceCostEmpty : ''}`}
-                          placeholder="e.g. 150"
-                          min={0}
-                          step="0.01"
-                          value={services[existingIdx]?.cost ?? ''}
-                          onChange={(e) => updateServiceRow(existingIdx, 'cost', e.target.value)}
-                          disabled={saving || readOnly}
-                        />
-                      </div>
-                    )}
+                    {isSelected && (() => {
+                      const costValue = services[existingIdx]?.cost ?? '';
+                      const isMissing = !(parseFloat(costValue) > 0);
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '0.8rem', color: '#6b7280', whiteSpace: 'nowrap' }}>EGP</span>
+                          <input
+                            type="number"
+                            className={[
+                              styles.serviceCostInput,
+                              isMissing && submitAttempted ? styles.serviceCostError : '',
+                              isMissing && !submitAttempted ? styles.serviceCostEmpty : '',
+                            ].filter(Boolean).join(' ')}
+                            placeholder="e.g. 150"
+                            min={0}
+                            step="0.01"
+                            required
+                            value={costValue}
+                            onChange={(e) => updateServiceRow(existingIdx, 'cost', e.target.value)}
+                            disabled={saving || readOnly}
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
-              <p className={styles.fieldHint}>
-                <i className="bi bi-exclamation-circle" style={{ color: '#f59e0b' }} /> Enter the cost (EGP) for each selected service — this will appear to staff when booking appointments.
-              </p>
+              {serviceCostError ? (
+                <p className={styles.fieldHint} style={{ color: '#e74c3c' }}>
+                  <i className="bi bi-exclamation-circle-fill" /> {serviceCostError}
+                </p>
+              ) : (
+                <p className={styles.fieldHint}>
+                  <i className="bi bi-exclamation-circle" style={{ color: '#f59e0b' }} /> Enter the cost (EGP) for each selected service — this will appear to staff when booking appointments.
+                </p>
+              )}
             </>
           )}
         </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
 import clinicBranchesService from '../../services/clinic/clinicBranchesService';
+import clinicStaffService from '../../services/clinic/clinicStaffService';
 import { hasClinicPermission } from '../../utils/clinicPermissions';
 import type { CreateBranchPayload, UpdateBranchPayload } from '../../types/clinic.types';
 import BranchForm from './BranchForm';
@@ -10,7 +11,7 @@ import PawLoader from '../../components/common/PawLoader/PawLoader';
 import styles from './Branches.module.scss';
 
 export default function CreateBranch() {
-  const { clinicId, staff } = useClinicAuth();
+  const { clinicId, staff, updateStaff } = useClinicAuth();
   const navigate = useNavigate();
   const canCreateBranch = hasClinicPermission(staff, 'clinic-branches.create');
 
@@ -22,7 +23,27 @@ export default function CreateBranch() {
     setSaving(true);
     setServerError('');
     try {
-      await clinicBranchesService.create(clinicId, payload as CreateBranchPayload);
+      const created = await clinicBranchesService.create(clinicId, payload as CreateBranchPayload);
+
+      // The creator isn't automatically assigned to the branch they just made — without
+      // this, they'd have no access to it until someone else manually assigns them.
+      // Owners are excluded: the assignments endpoint explicitly rejects touching an
+      // owner's own assignment set (owners already have clinic-wide access some other
+      // way), so there's nothing to add for them here.
+      if (staff && !staff.isOwner) {
+        try {
+          const existingBranchIds = (staff.branches ?? []).map((b) => Number(b.id));
+          const refreshedStaff = await clinicStaffService.updateAssignments(staff.id, {
+            clinicBranchIds: [...existingBranchIds, Number(created.id)],
+          });
+          updateStaff(refreshedStaff);
+        } catch {
+          // The branch itself was already created successfully — don't fail the whole
+          // flow over the self-assignment step; worst case matches the old behavior
+          // (someone assigns them to it after the fact).
+        }
+      }
+
       navigate('/branches', { state: { successMsg: 'Branch created successfully.' } });
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Failed to create branch.');
