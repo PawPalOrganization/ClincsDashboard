@@ -1,24 +1,41 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClinicAuth } from '../../context/ClinicAuthContext';
-import clinicNotificationService from '../../services/clinic/clinicNotificationService';
+import {
+  useClinicNotifications,
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  unreadCountOf,
+} from '../../hooks/useClinicNotifications';
 import { notificationTargetPath } from '../../utils/notificationTargetPath';
 import type { ClinicNotification } from '../../types/clinic.types';
-import type { Column } from '../../components/common/DataTable/DataTable';
-import DataTable from '../../components/common/DataTable/DataTable';
 import Button from '../../components/common/Button/Button';
 import PageHeaderSkeleton from '../../components/common/Skeleton/PageHeaderSkeleton';
 import styles from './Notifications.module.scss';
 
-type NotifRow = ClinicNotification & Record<string, unknown>;
-
 const LIMIT = 20;
+
+// Same three shapes the sidebar bell/toast already distinguish (see NotificationToast.tsx) —
+// gives each row a type-colored icon instead of a flat bullet, so the feed reads at a
+// glance instead of every row looking identical.
+function iconFor(n: ClinicNotification): { icon: string; bg: string; color: string } {
+  if (n.type === 'appointment_cancelled') {
+    return { icon: 'bi-calendar-x-fill', bg: 'rgba(231,76,60,0.10)', color: '#e74c3c' };
+  }
+  if (n.type === 'appointment_booked') {
+    return { icon: 'bi-calendar-check-fill', bg: 'rgba(13,154,255,0.10)', color: '#0d9aff' };
+  }
+  if (n.type?.startsWith('review_')) {
+    return { icon: 'bi-star-fill', bg: 'rgba(243,156,18,0.12)', color: '#f39c12' };
+  }
+  return { icon: 'bi-bell-fill', bg: 'rgba(107,114,128,0.12)', color: '#6b7280' };
+}
 
 function formatDateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat(undefined, {
-    month: 'short', day: 'numeric', year: 'numeric',
+    month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   }).format(date);
 }
@@ -27,123 +44,23 @@ export default function NotificationsList() {
   const { clinicId } = useClinicAuth();
   const navigate = useNavigate();
 
-  const [notifications, setNotifications] = useState<NotifRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [page, setPage] = useState(1);
-  // Clinic-wide unread count, not just this page's — drives whether "Mark all as
-  // read" is available regardless of which page is currently showing.
-  const [unreadTotal, setUnreadTotal] = useState(0);
+  const { data, isLoading, isFetching, error } = useClinicNotifications(page, LIMIT, {
+    enabled: !!clinicId,
+  });
 
-  const [loading, setLoading] = useState(true);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
-  const [markingAllRead, setMarkingAllRead] = useState(false);
-  const [markingReadId, setMarkingReadId] = useState<string | number | null>(null);
+  const markReadMutation = useMarkNotificationRead();
+  const markAllReadMutation = useMarkAllNotificationsRead();
 
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const result = await clinicNotificationService.list({ page, limit: LIMIT });
-      setNotifications(result.items as NotifRow[]);
-      setTotal(result.meta.total);
-      setTotalPages(result.meta.totalPages);
-      // The list endpoint's meta carries a clinic-wide unreadCount on at least the
-      // sidebar's fetch (see ClinicSidebar.tsx) — fall back to this page's own
-      // unread count if that field isn't present.
-      setUnreadTotal(
-        (result.meta as unknown as Record<string, unknown>).unreadCount as number
-          ?? result.items.filter((n) => !n.isRead).length,
-      );
-      setHasLoaded(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load notifications.');
-    } finally {
-      setLoading(false);
-    }
-  }, [page]);
+  const notifications = data?.items ?? [];
+  const total = data?.meta.total ?? 0;
+  const totalPages = data?.meta.totalPages ?? 1;
+  const unreadTotal = unreadCountOf(data);
 
-  useEffect(() => {
-    if (!clinicId) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch pattern: fetchNotifications flags loading, then fetches
-    fetchNotifications();
-  }, [clinicId, fetchNotifications]);
-
-  async function handleMarkRead(id: string | number) {
-    setMarkingReadId(id);
-    setActionError('');
-    try {
-      await clinicNotificationService.markRead(id);
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
-      setUnreadTotal((prev) => Math.max(0, prev - 1));
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to mark notification as read.');
-    } finally {
-      setMarkingReadId(null);
-    }
-  }
-
-  async function handleMarkAllRead() {
-    setMarkingAllRead(true);
-    setActionError('');
-    try {
-      await clinicNotificationService.markAllRead();
-      await fetchNotifications();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to mark all notifications as read.');
-    } finally {
-      setMarkingAllRead(false);
-    }
-  }
-
-  function handleOpen(n: NotifRow) {
-    if (!n.isRead) handleMarkRead(n.id);
+  function handleOpen(n: ClinicNotification) {
+    if (!n.isRead) markReadMutation.mutate(n.id);
     navigate(notificationTargetPath(n));
   }
-
-  const columns: Column<NotifRow>[] = [
-    {
-      key: 'notification',
-      label: 'Notification',
-      render: (row) => (
-        <div className={styles.notifCell} onClick={() => handleOpen(row)}>
-          {!row.isRead
-            ? <span className={styles.notifDot} aria-label="Unread" />
-            : <span className={styles.notifDotPlaceholder} />}
-          <div>
-            {/* Plain text only — do NOT change to dangerouslySetInnerHTML */}
-            <div className={styles.notifTitle}>{row.title}</div>
-            <div className={styles.notifBody}>{row.body}</div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'createdAt',
-      label: 'Date',
-      width: '190px',
-      render: (row) => <span className={styles.cellText}>{formatDateTime(row.createdAt)}</span>,
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      width: '130px',
-      render: (row) => row.isRead ? (
-        <span className={styles.readBadge}>Read</span>
-      ) : (
-        <button
-          type="button"
-          className={styles.markReadBtn}
-          onClick={(e) => { e.stopPropagation(); handleMarkRead(row.id); }}
-          disabled={markingReadId === row.id}
-        >
-          {markingReadId === row.id ? 'Marking…' : 'Mark read'}
-        </button>
-      ),
-    },
-  ];
 
   if (!clinicId) {
     return (
@@ -154,7 +71,7 @@ export default function NotificationsList() {
     );
   }
 
-  const isInitialLoad = loading && !hasLoaded;
+  const isInitialLoad = isLoading && !data;
 
   return (
     <div className={styles.page}>
@@ -173,9 +90,9 @@ export default function NotificationsList() {
           <Button
             variant="outline"
             icon="bi-check2-all"
-            onClick={handleMarkAllRead}
-            loading={markingAllRead}
-            disabled={markingAllRead || unreadTotal === 0}
+            onClick={() => markAllReadMutation.mutate()}
+            loading={markAllReadMutation.isPending}
+            disabled={markAllReadMutation.isPending || unreadTotal === 0}
           >
             Mark all as read
           </Button>
@@ -184,27 +101,93 @@ export default function NotificationsList() {
 
       {error && (
         <div className={`alert alert-danger py-2 ${styles.feedbackAlert}`} role="alert">
-          <i className="bi bi-exclamation-circle-fill" /> {error}
+          <i className="bi bi-exclamation-circle-fill" /> {error instanceof Error ? error.message : 'Failed to load notifications.'}
         </div>
       )}
 
-      {actionError && (
+      {markReadMutation.isError && (
         <div className={`alert alert-warning py-2 ${styles.feedbackAlert}`} role="alert">
-          <i className="bi bi-exclamation-triangle-fill" /> {actionError}
+          <i className="bi bi-exclamation-triangle-fill" /> Failed to mark notification as read.
         </div>
       )}
 
-      <DataTable
-        columns={columns}
-        data={notifications}
-        loading={loading}
-        currentPage={page}
-        totalPages={totalPages}
-        totalItems={total}
-        pageSize={LIMIT}
-        onPageChange={setPage}
-        emptyMessage="No notifications yet."
-      />
+      {markAllReadMutation.isError && (
+        <div className={`alert alert-warning py-2 ${styles.feedbackAlert}`} role="alert">
+          <i className="bi bi-exclamation-triangle-fill" /> Failed to mark all notifications as read.
+        </div>
+      )}
+
+      {!isInitialLoad && notifications.length === 0 ? (
+        <div className={styles.empty}>
+          <i className="bi bi-bell-slash" />
+          <p>No notifications yet.</p>
+        </div>
+      ) : (
+        <div className={`list-group ${styles.feed} ${isFetching ? styles.feedLoading : ''}`}>
+          {notifications.map((n) => {
+            const meta = iconFor(n);
+            const markingThis = markReadMutation.isPending && markReadMutation.variables === n.id;
+            return (
+              <div
+                key={String(n.id)}
+                className={`list-group-item list-group-item-action ${styles.row} ${!n.isRead ? styles.rowUnread : ''}`}
+                onClick={() => handleOpen(n)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && handleOpen(n)}
+              >
+                <span className={styles.rowIcon} style={{ background: meta.bg, color: meta.color }}>
+                  <i className={`bi ${meta.icon}`} />
+                </span>
+
+                <div className={styles.rowBody}>
+                  <div className={styles.rowTop}>
+                    {/* Plain text only — do NOT change to dangerouslySetInnerHTML */}
+                    <span className={styles.rowTitle}>{n.title}</span>
+                    {!n.isRead && <span className={`badge rounded-pill ${styles.newBadge}`}>New</span>}
+                  </div>
+                  <p className={styles.rowText}>{n.body}</p>
+                  <span className={styles.rowTime}>{formatDateTime(n.createdAt)}</span>
+                </div>
+
+                {!n.isRead && (
+                  <button
+                    type="button"
+                    className={styles.markReadBtn}
+                    onClick={(e) => { e.stopPropagation(); markReadMutation.mutate(n.id); }}
+                    disabled={markingThis}
+                    title="Mark as read"
+                  >
+                    <i className={`bi ${markingThis ? 'bi-hourglass-split' : 'bi-check2'}`} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className={styles.pager}>
+          <button
+            type="button"
+            className={styles.pagerBtn}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1 || isFetching}
+          >
+            <i className="bi bi-chevron-left" /> Newer
+          </button>
+          <span className={styles.pagerLabel}>Page {page} of {totalPages}</span>
+          <button
+            type="button"
+            className={styles.pagerBtn}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages || isFetching}
+          >
+            Older <i className="bi bi-chevron-right" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

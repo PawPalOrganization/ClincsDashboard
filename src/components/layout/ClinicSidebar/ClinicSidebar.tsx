@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useClinicAuth } from '../../../context/ClinicAuthContext';
 import { hasAnyClinicPermission, hasClinicPermission } from '../../../utils/clinicPermissions';
 import type { ClinicPermissionSlug } from '../../../utils/clinicPermissions';
 import clinicProfileService from '../../../services/clinic/clinicProfileService';
-import clinicNotificationService from '../../../services/clinic/clinicNotificationService';
 import { useClinicPusher } from '../../../hooks/useClinicPusher';
+import {
+  useClinicNotifications,
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  usePrependNotification,
+  unreadCountOf,
+} from '../../../hooks/useClinicNotifications';
 import NotificationToast from '../../common/NotificationToast/NotificationToast';
 import type { ToastItem } from '../../common/NotificationToast/NotificationToast';
 import { notificationTargetPath } from '../../../utils/notificationTargetPath';
@@ -50,66 +56,35 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
   });
 
   // ── Notifications ──────────────────────────────────────────────────────────
-  const [notifications, setNotifications] = useState<ClinicNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Backed by React Query, same cache the full /notifications page reads from — this
+  // is what keeps the two in sync: marking read from either place invalidates the
+  // shared query key, so whichever surface is mounted (the sidebar always is) refetches
+  // and shows the same read/unread state instead of drifting apart.
+  const { data } = useClinicNotifications(1, 10, { refetchInterval: 60_000 });
+  const notifications = data?.items ?? [];
+  const unreadCount = unreadCountOf(data);
+
+  const markReadMutation = useMarkNotificationRead();
+  const markAllReadMutation = useMarkAllNotificationsRead();
+  const prependNotification = usePrependNotification();
+
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const seenIdsRef = useRef<Set<string | number>>(new Set());
-  const initialLoadDoneRef = useRef(false);
 
   function dismissToast(key: string) {
     setToasts((prev) => prev.filter((t) => t.key !== key));
   }
 
-  const loadNotifications = useCallback(async () => {
-    try {
-      const res = await clinicNotificationService.list({ limit: 10 });
-      const items = res.items;
-
-      if (initialLoadDoneRef.current) {
-        // On subsequent polls, surface any unread IDs we haven't seen before
-        const fresh = items.filter((n) => !n.isRead && !seenIdsRef.current.has(n.id));
-        if (fresh.length > 0) {
-          setToasts((prev) => [
-            ...prev.slice(-(2)),          // keep at most 2 existing
-            ...fresh.map((n) => ({ notification: n, key: `${n.id}-${Date.now()}` })),
-          ]);
-        }
-      }
-
-      items.forEach((n) => seenIdsRef.current.add(n.id));
-      initialLoadDoneRef.current = true;
-
-      setNotifications(items);
-      setUnreadCount(
-        (res.meta as unknown as Record<string, unknown>).unreadCount as number
-          ?? items.filter((n) => !n.isRead).length,
-      );
-    } catch {
-      // Silently ignore — the bell dropdown just stays empty until the next poll/Pusher event.
-    }
-  }, []);
-
-  useEffect(() => {
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 60_000);
-    return () => clearInterval(interval);
-  }, [loadNotifications]);
-
   // ── Pusher real-time notifications ────────────────────────────────────────
-  const handlePusherNotification = useCallback((n: ClinicNotification) => {
-    // Prepend to the bell list
-    setNotifications((prev) => [n, ...prev.slice(0, 19)]);
-    // Increment badge
-    setUnreadCount((prev) => prev + 1);
-    // Show toast
+  function handlePusherNotification(n: ClinicNotification) {
+    prependNotification(n);
     setToasts((prev) => [
       ...prev.slice(-2),
       { notification: n, key: `${n.id}-${Date.now()}` },
     ]);
-  }, []);
+  }
 
   useClinicPusher({ token, staff, branchId, onNotification: handlePusherNotification });
 
@@ -124,31 +99,12 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [bellOpen]);
 
-  async function handleMarkRead(id: string | number) {
-    try {
-      await clinicNotificationService.markRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {
-      // Silently ignore — the notification stays unread in the UI; user can retry.
-    }
+  function handleMarkRead(id: string | number) {
+    markReadMutation.mutate(id);
   }
 
-  const [markingAllRead, setMarkingAllRead] = useState(false);
-
-  async function handleMarkAllRead() {
-    setMarkingAllRead(true);
-    try {
-      await clinicNotificationService.markAllRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-    } catch {
-      // Silently ignore — unread notifications stay as-is; user can retry.
-    } finally {
-      setMarkingAllRead(false);
-    }
+  function handleMarkAllRead() {
+    markAllReadMutation.mutate();
   }
 
   // ── Tab title + favicon — side effects driven by React Query's clinic data ──
@@ -263,9 +219,9 @@ export default function ClinicSidebar({ isOpen, onClose }: ClinicSidebarProps) {
                     type="button"
                     className={styles.notifMarkAllBtn}
                     onClick={handleMarkAllRead}
-                    disabled={markingAllRead}
+                    disabled={markAllReadMutation.isPending}
                   >
-                    {markingAllRead ? 'Marking…' : 'Mark all read'}
+                    {markAllReadMutation.isPending ? 'Marking…' : 'Mark all read'}
                   </button>
                 )}
               </div>

@@ -1,7 +1,7 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .pageHeader {
@@ -33,68 +33,157 @@
   font-size: 0.875rem;
 }
 
-// ─── Notification cell ─────────────────────────────────────────────────────────
+// ─── Feed ───────────────────────────────────────────────────────────────────────
+// Bootstrap's .list-group supplies the container, dividers, and item hover/focus
+// states — the row classes below only add what's specific to a notification (icon,
+// unread tint, the New badge, the inline mark-read button).
 
-.notifCell {
+.feed {
+  border-radius: 0.875rem;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: opacity 0.15s;
+}
+
+.feedLoading {
+  opacity: 0.6;
+}
+
+.row {
   display: flex;
   align-items: flex-start;
-  gap: 0.625rem;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
   cursor: pointer;
-  padding: 0.25rem 0;
+  border-left: 3px solid transparent;
 }
 
-.notifDot {
+.rowUnread {
+  background: rgba(13, 154, 255, 0.04);
+  border-left-color: var(--color-primary, #0d9aff);
+}
+
+.rowIcon {
   flex-shrink: 0;
-  width: 8px;
-  height: 8px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: var(--color-primary, #0d9aff);
-  margin-top: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
 }
 
-.notifDotPlaceholder {
-  flex-shrink: 0;
-  width: 8px;
+.rowBody {
+  flex: 1;
+  min-width: 0;
 }
 
-.notifTitle {
-  font-size: 0.85rem;
+.rowTop {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rowTitle {
+  font-size: 0.875rem;
   font-weight: 600;
   color: #1a1d2e;
-  margin-bottom: 0.15rem;
   line-height: 1.35;
 }
 
-.notifBody {
+.newBadge {
+  background: var(--color-primary, #0d9aff);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.rowText {
   font-size: 0.8rem;
   color: #6b7280;
   line-height: 1.4;
+  margin: 0.15rem 0 0.25rem;
 }
 
-.cellText {
-  font-size: 0.85rem;
-  color: #4b5563;
-}
-
-.readBadge {
+.rowTime {
   font-size: 0.72rem;
-  font-weight: 600;
   color: #9ba3af;
 }
 
 .markReadBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
-  border: 1px solid var(--color-primary, #0d9aff);
-  color: var(--color-primary, #0d9aff);
-  border-radius: 0.4rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 0.25rem 0.6rem;
+  border: 1px solid #dee2e6;
+  border-radius: 50%;
+  color: #6b7280;
   cursor: pointer;
-  white-space: nowrap;
+  font-size: 0.8rem;
 
-  &:hover { background: rgba(13, 154, 255, 0.08); }
+  &:hover { background: var(--color-primary, #0d9aff); border-color: var(--color-primary, #0d9aff); color: #fff; }
   &:disabled { opacity: 0.5; cursor: default; }
+}
+
+// ─── Pager ──────────────────────────────────────────────────────────────────────
+// A compact prev/next pager — the feed is a single dense column, not a wide table,
+// so DataTable's numbered-page footer would be oversized for it.
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.pagerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #4b5563;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { border-color: var(--color-primary, #0d9aff); color: var(--color-primary, #0d9aff); }
+  &:disabled { opacity: 0.4; cursor: default; }
+}
+
+.pagerLabel {
+  font-size: 0.8rem;
+  color: #9ba3af;
+}
+
+// ─── Empty state ────────────────────────────────────────────────────────────────
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: #9ba3af;
+
+  i {
+    font-size: 2.5rem;
+    color: #d1d5db;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.875rem;
+  }
 }
 
 // ─── Guards ───────────────────────────────────────────────────────────────────

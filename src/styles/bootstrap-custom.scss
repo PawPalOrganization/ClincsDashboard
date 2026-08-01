@@ -1,5 +1,5 @@
 // Selective Bootstrap 5 import — only modules actually used in PawClinics.
-// Skips: buttons, forms, modals, navbar, cards, badges, pagination, breadcrumbs,
+// Skips: buttons, forms, modals, navbar, cards, pagination, breadcrumbs,
 // progress, spinners, accordion, carousel, offcanvas, toast, tables, popovers, etc.
 // Estimated savings vs full bootstrap.min.css: ~180 KB
 
@@ -21,6 +21,8 @@
 
 // ── 4. Components ─────────────────────────────────────────────────────────────
 @import 'bootstrap/scss/alert';         // .alert .alert-danger .alert-info .alert-warning
+@import 'bootstrap/scss/list-group';    // .list-group .list-group-item(-action) — Notifications feed
+@import 'bootstrap/scss/badge';         // .badge — unread pill
 
 // ── 5. Utility classes ────────────────────────────────────────────────────────
 // Generates: d-flex, d-none, d-lg-flex, align-items-*, justify-content-*,
