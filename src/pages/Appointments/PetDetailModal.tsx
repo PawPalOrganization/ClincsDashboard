@@ -5,6 +5,7 @@ import { useClinicStaffDirectory } from '../../hooks/useClinicStaffDirectory';
 import type { PetProfile, PetMedicine, Appointment } from '../../types/clinic.types';
 import Modal from '../../components/common/Modal/Modal';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
+import VaccinationsTab from './VaccinationsTab';
 import styles from './Appointments.module.scss';
 
 interface PetDetailModalProps {
@@ -15,7 +16,7 @@ interface PetDetailModalProps {
   onClose: () => void;
 }
 
-type Tab = 'profile' | 'medicines' | 'history';
+type Tab = 'profile' | 'medicines' | 'vaccinations' | 'history';
 
 const MEDICINE_CATEGORY_LABELS: Record<string, string> = {
   vaccine: 'Vaccine',
@@ -132,6 +133,9 @@ export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onCl
         </button>
         <button type="button" style={tabStyle('medicines')} onClick={() => setActiveTab('medicines')}>
           <i className="bi bi-capsule" /> Medicines
+        </button>
+        <button type="button" style={tabStyle('vaccinations')} onClick={() => setActiveTab('vaccinations')}>
+          <i className="bi bi-shield-plus" /> Vaccinations
         </button>
         <button type="button" style={tabStyle('history')} onClick={() => setActiveTab('history')}>
           <i className="bi bi-clock-history" /> Visit History
@@ -294,6 +298,16 @@ export default function PetDetailModal({ petId, clinicId, branchId, isOpen, onCl
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Vaccinations tab ── */}
+      {activeTab === 'vaccinations' && (
+        <VaccinationsTab
+          petId={petId}
+          clinicId={clinicId}
+          branchId={branchId}
+          staffDirectory={staffDirectory}
+        />
       )}
 
       {/* ── Visit History tab ── */}

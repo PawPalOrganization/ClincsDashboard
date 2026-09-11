@@ -32,7 +32,11 @@ export type ClinicPermissionSlug =
   | 'pets.create'
   | 'reviews.read'
   | 'dashboard.overview.read'
-  | 'dashboard.finance.read';
+  | 'dashboard.finance.read'
+  | 'vaccinations.read'
+  | 'vaccinations.create'
+  | 'vaccinations.update'
+  | 'vaccinations.delete';
 
 const PRIVILEGED_ROLE_WORDS = ['owner'];
 

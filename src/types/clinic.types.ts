@@ -102,6 +102,10 @@ export interface BranchWorkingHour {
   endTime: string;   // "HH:mm"
 }
 
+// Same shape as BranchWorkingHour, but multiple windows are allowed per weekday and
+// each one must sit inside that day's working hours (server-validated).
+export type BranchRushHour = BranchWorkingHour;
+
 // isActive intentionally excluded — clinic staff cannot toggle branch status
 export interface ClinicBranch {
   id: string | number;
@@ -117,6 +121,7 @@ export interface ClinicBranch {
   services?: BranchService[];
   tags?: Array<string | number | { id?: string | number; name?: string; title?: string }>;
   workingHours?: BranchWorkingHour[];
+  rushHours?: BranchRushHour[];
   avgRating?: number;
   reviewsCount?: number;
   reviewsEnabled?: boolean;
@@ -224,6 +229,7 @@ export interface CreateBranchPayload {
   services?: BranchService[];
   tags?: string[];
   workingHours?: BranchWorkingHour[];
+  rushHours?: BranchRushHour[];
 }
 
 // PUT /clinic/api/clinics/:clinicId/branches/:branchId
@@ -240,6 +246,7 @@ export interface UpdateBranchPayload {
   services?: BranchService[];
   tags?: string[];
   workingHours?: BranchWorkingHour[];
+  rushHours?: BranchRushHour[];
 }
 
 // POST /clinic/api/clinic-staff
@@ -576,6 +583,101 @@ export interface PetProfile {
   breed?: { id: number; name: string };
   owner?: { userId: number; firstName: string; lastName: string; phoneNumber: string };
   medicines?: PetMedicine[];
+}
+
+// ─── Clinic vaccinations ──────────────────────────────────────────────────────
+// A clinic-authored vaccination log, separate from the owner's PetMedicine vaccine
+// diary above. A plan is one series (e.g. a 3-dose rabies course); the backend keeps
+// only the next pending dose materialized at a time, not the full future schedule.
+
+export interface VaccinationType {
+  id: number;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type VaccinationRecurrenceType = 'one_time' | 'daily' | 'weekly' | 'monthly' | 'annually';
+export type VaccinationDoseStatus = 'pending' | 'done' | 'missed';
+// Backend-computed display chip from the list endpoint — distinct from the raw `status`
+// above (e.g. a `pending` dose becomes `overdue` once its date has passed).
+export type VaccinationListStatus = 'completed' | 'upcoming' | 'overdue';
+
+export interface VaccinationPlan {
+  id: number;
+  vaccinationTypeId: number;
+  title: string;
+  notes?: string | null;
+  clinicStaffId: number;
+  clinicBranchId: number;
+  clinicId: number;
+  petId: number;
+  petOwnerId?: number;
+  recurrenceType: VaccinationRecurrenceType;
+  recurrenceCount: number;
+  timezone: string;
+  startDate: string;
+  nextDue?: string | null;
+}
+
+// One dose/occurrence in a plan's series.
+export interface Vaccination {
+  id: number;
+  vaccinationTypeId: number;
+  vaccinationType?: VaccinationType;
+  title: string;
+  date: string;
+  occurrenceIndex: number;
+  status: VaccinationDoseStatus;
+  listStatus?: VaccinationListStatus;
+  notified?: boolean;
+  shouldBeNotified?: boolean;
+  clinicNotes?: string | null;
+  petOwnerNotes?: string | null;
+  doseInfo?: string | null;
+  petId: number;
+  clinicId: number;
+  plan?: VaccinationPlan;
+}
+
+// POST /clinic/api/pets/:petId/vaccination-plans
+// Required: vaccinationTypeId, clinicBranchId, clinicId, date, timezone.
+// clinicStaffId omitted → defaults to the logged-in staff server-side.
+export interface CreateVaccinationPlanPayload {
+  vaccinationTypeId: number;
+  title?: string;
+  notes?: string;
+  clinicStaffId?: number;
+  clinicBranchId: number;
+  clinicId: number;
+  recurrenceType?: VaccinationRecurrenceType;
+  recurrenceCount?: number;
+  date: string; // YYYY-MM-DD
+  timezone: string; // IANA
+  shouldBeNotified?: boolean;
+}
+
+// PUT /clinic/api/vaccination-plans/:id
+// recurrenceType/recurrenceCount → 409 once any dose in the series is done.
+export interface UpdateVaccinationPlanPayload {
+  title?: string;
+  notes?: string;
+  recurrenceType?: VaccinationRecurrenceType;
+  recurrenceCount?: number;
+}
+
+// PUT /clinic/api/vaccinations/:id
+export interface UpdateVaccinationPayload {
+  clinicNotes?: string;
+  doseInfo?: string;
+  date?: string; // pending dose only — moves the linked reminder
+  status?: 'done';
+}
+
+export interface VaccinationListParams {
+  clinicId: string | number;
+  search?: string;
+  status?: VaccinationListStatus;
 }
 
 // Kept for backward-compat — old search returned this shape; new endpoint returns UserSearchResponse

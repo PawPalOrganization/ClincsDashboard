@@ -9,6 +9,7 @@ import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
 import PageHeaderSkeleton from '../../components/common/Skeleton/PageHeaderSkeleton';
 import TablePageSkeleton from '../../components/common/Skeleton/TablePageSkeleton';
+import PetDetailModal from '../Appointments/PetDetailModal';
 import styles from './Patients.module.scss';
 
 type PatientRow = PatientDirectoryItem & Record<string, unknown>;
@@ -49,6 +50,8 @@ export default function PatientsList() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [loadingBranches, setLoadingBranches] = useState(true);
   const [error, setError] = useState('');
+
+  const [petModalId, setPetModalId] = useState<number | null>(null);
 
   // Reset to page 1 whenever the (deferred) search text actually changes — the other
   // filters already reset page directly in their onChange handlers below. Adjusting
@@ -135,7 +138,15 @@ export default function PatientsList() {
         return (
           <div className={styles.petPillList}>
             {preview.map((pet) => (
-              <span key={pet.id} className={styles.petPill}>{pet.name}</span>
+              <button
+                key={pet.id}
+                type="button"
+                className={styles.petPill}
+                onClick={(e) => { e.stopPropagation(); setPetModalId(pet.id); }}
+                title={`View ${pet.name}'s profile`}
+              >
+                {pet.name}
+              </button>
             ))}
             {row.sharedPetsCount > preview.length && (
               <span className={styles.petPillMore}>+{row.sharedPetsCount - preview.length}</span>
@@ -191,8 +202,23 @@ export default function PatientsList() {
 
   const isInitialLoad = loading && !hasLoaded;
 
+  // No per-row branch signal in the directory list (unlike the full patient profile) —
+  // fall back to whatever branch filter is active, then any branch on the clinic. Only
+  // matters for creating a vaccination plan from the modal.
+  const defaultPetBranchId = selectedBranchId || (branches[0]?.id != null ? String(branches[0].id) : undefined);
+
   return (
     <div className={styles.page}>
+      {petModalId != null && clinicId && (
+        <PetDetailModal
+          petId={petModalId}
+          clinicId={clinicId}
+          branchId={defaultPetBranchId}
+          isOpen
+          onClose={() => setPetModalId(null)}
+        />
+      )}
+
       {isInitialLoad ? (
         <PageHeaderSkeleton />
       ) : (

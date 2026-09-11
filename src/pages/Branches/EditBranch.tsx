@@ -74,6 +74,7 @@ export default function EditBranch() {
           services:     branch.services,
           tags:         branch.tags,
           workingHours: branch.workingHours,
+          rushHours:    branch.rushHours,
         }
       : undefined,
     [branch],

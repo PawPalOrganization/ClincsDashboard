@@ -518,6 +518,108 @@
   font-style: italic;
 }
 
+// ─── Rush hours ───────────────────────────────────────────────────────────────
+
+.dayBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.rushRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.3rem 0.75rem 0.6rem 2.35rem;
+}
+
+.rushLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding-top: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b45309;
+  white-space: nowrap;
+
+  i { color: #f59e0b; }
+}
+
+.rushChips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.rushChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.4rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+}
+
+.rushTimeInput {
+  width: 88px;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #fde68a;
+  border-radius: 0.3rem;
+  font-size: 0.78rem;
+  font-family: inherit;
+  color: inherit;
+  background: #ffffff;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #f59e0b;
+  }
+
+  &:disabled {
+    background: #f8f9fa;
+    opacity: 0.6;
+  }
+}
+
+.rushRemoveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 0.9rem;
+  line-height: 1;
+  color: #b45309;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+
+  &:hover { color: #92400e; }
+  &:disabled { cursor: not-allowed; opacity: 0.5; }
+}
+
+.addRushBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #0d9aff;
+  background: none;
+  border: 1px dashed #b8dcff;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover { background: rgba(13, 154, 255, 0.06); }
+  &:disabled { cursor: not-allowed; opacity: 0.5; }
+}
+
 // ─── Service rows ─────────────────────────────────────────────────────────────
 
 .serviceCostInput {

@@ -5,6 +5,7 @@ import Button from '../../components/common/Button/Button';
 import LocationLinkInput from '../../components/common/LocationLinkInput/LocationLinkInput';
 import clinicCatalogService from '../../services/clinic/clinicCatalogService';
 import type {
+  BranchRushHour,
   BranchService,
   BranchWorkingHour,
   ClinicBranch,
@@ -29,6 +30,7 @@ export interface BranchFormInitialValues {
   services?: ClinicBranch['services'];
   tags?: ClinicBranch['tags'];
   workingHours?: BranchWorkingHour[];
+  rushHours?: BranchRushHour[];
 }
 
 interface ServiceRow {
@@ -39,6 +41,13 @@ interface ServiceRow {
 interface HourEntry {
   dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   enabled: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+interface RushWindow {
+  key: string;
+  dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   startTime: string;
   endTime: string;
 }
@@ -112,6 +121,29 @@ function buildDefaultHours(workingHours?: BranchWorkingHour[]): HourEntry[] {
   });
 }
 
+let rushWindowKeySeq = 0;
+
+function buildDefaultRushWindows(rushHours?: BranchRushHour[]): RushWindow[] {
+  if (!Array.isArray(rushHours)) return [];
+  return rushHours.map((w) => ({
+    key: `rush-${rushWindowKeySeq++}`,
+    dayOfWeek: w.dayOfWeek,
+    startTime: stripSeconds(w.startTime),
+    endTime: stripSeconds(w.endTime),
+  }));
+}
+
+// Keeps a rush window from sitting outside its day's (possibly just-shrunk) working
+// hours — the API rejects that combination, so the UI clips proactively instead of
+// only surfacing it as a save-time error.
+function clipWindowToHours(win: RushWindow, dayHours: { startTime: string; endTime: string }): RushWindow {
+  return {
+    ...win,
+    startTime: win.startTime < dayHours.startTime ? dayHours.startTime : win.startTime,
+    endTime: win.endTime > dayHours.endTime ? dayHours.endTime : win.endTime,
+  };
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function BranchForm({
@@ -158,9 +190,11 @@ export default function BranchForm({
   const [tagInput, setTagInput]       = useState('');
   const [services, setServices]       = useState<ServiceRow[]>(() => buildDefaultServices(defaultValues?.services));
   const [hours, setHours]             = useState<HourEntry[]>(() => buildDefaultHours(defaultValues?.workingHours));
+  const [rushWindows, setRushWindows] = useState<RushWindow[]>(() => buildDefaultRushWindows(defaultValues?.rushHours));
 
   const [titleError, setTitleError] = useState('');
   const [serviceCostError, setServiceCostError] = useState('');
+  const [rushHoursError, setRushHoursError] = useState('');
   // Only escalates an unfilled cost to the hard red error style after a submit attempt
   // has actually failed on it — otherwise every freshly-checked service would show as
   // an error before the user has had a chance to type anything.
@@ -192,15 +226,83 @@ export default function BranchForm({
   }
 
   function toggleDay(day: number) {
+    const wasEnabled = hours.find((h) => h.dayOfWeek === day)?.enabled ?? false;
     setHours((prev) =>
       prev.map((h) => (h.dayOfWeek === day ? { ...h, enabled: !h.enabled } : h)),
     );
+    // Closing a day invalidates any rush windows on it — drop them rather than
+    // leaving stale windows the API would reject on save.
+    if (wasEnabled) {
+      setRushWindows((prev) => prev.filter((w) => w.dayOfWeek !== day));
+    }
   }
 
   function updateHour(day: number, field: 'startTime' | 'endTime', value: string) {
+    const current = hours.find((h) => h.dayOfWeek === day);
+    const updatedDayHours = { startTime: current?.startTime ?? '09:00', endTime: current?.endTime ?? '17:00', [field]: value };
+
     setHours((prev) =>
       prev.map((h) => (h.dayOfWeek === day ? { ...h, [field]: value } : h)),
     );
+
+    // Working hours just moved/shrank — reclip this day's rush windows so none end up
+    // outside the new opening hours; drop any that collapse to zero width.
+    setRushWindows((prev) =>
+      prev
+        .map((w) => (w.dayOfWeek === day ? clipWindowToHours(w, updatedDayHours) : w))
+        .filter((w) => w.dayOfWeek !== day || w.startTime < w.endTime),
+    );
+  }
+
+  function addRushWindow(day: RushWindow['dayOfWeek']) {
+    const dayHours = hours.find((h) => h.dayOfWeek === day);
+    if (!dayHours?.enabled) return;
+    setRushWindows((prev) => [
+      ...prev,
+      { key: `rush-${rushWindowKeySeq++}`, dayOfWeek: day, startTime: dayHours.startTime, endTime: dayHours.endTime },
+    ]);
+  }
+
+  function removeRushWindow(key: string) {
+    setRushWindows((prev) => prev.filter((w) => w.key !== key));
+  }
+
+  function updateRushWindow(key: string, field: 'startTime' | 'endTime', value: string) {
+    setRushWindows((prev) => prev.map((w) => {
+      if (w.key !== key) return w;
+      const dayHours = hours.find((h) => h.dayOfWeek === w.dayOfWeek);
+      const next = { ...w, [field]: value };
+      return dayHours ? clipWindowToHours(next, dayHours) : next;
+    }));
+  }
+
+  // Validates the full rush-hours state right before submit: start < end, each window
+  // inside its day's working hours, and no same-day overlap — mirrors what the API
+  // itself enforces so the user sees the problem here instead of as a 400 later.
+  function validateRushWindows(finalHours: HourEntry[], windows: RushWindow[]): string {
+    const byDay = new Map<number, RushWindow[]>();
+    for (const w of windows) {
+      if (!(w.startTime < w.endTime)) {
+        return `Rush hours on ${DAY_NAMES[w.dayOfWeek]} must have a start time before the end time.`;
+      }
+      const dayHours = finalHours.find((h) => h.dayOfWeek === w.dayOfWeek);
+      if (!dayHours?.enabled) {
+        return `Rush hours are set on ${DAY_NAMES[w.dayOfWeek]}, but the branch is closed that day.`;
+      }
+      if (w.startTime < dayHours.startTime || w.endTime > dayHours.endTime) {
+        return `Rush hours on ${DAY_NAMES[w.dayOfWeek]} must fall within that day's working hours (${dayHours.startTime}–${dayHours.endTime}).`;
+      }
+      byDay.set(w.dayOfWeek, [...(byDay.get(w.dayOfWeek) ?? []), w]);
+    }
+    for (const windowsForDay of byDay.values()) {
+      const sorted = [...windowsForDay].sort((a, b) => a.startTime.localeCompare(b.startTime));
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].startTime < sorted[i - 1].endTime) {
+          return `Rush hour windows on ${DAY_NAMES[sorted[i].dayOfWeek]} overlap — adjust the times.`;
+        }
+      }
+    }
+    return '';
   }
 
   async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>) {
@@ -227,11 +329,18 @@ export default function BranchForm({
       setServiceCostError('');
     }
 
+    const rushError = validateRushWindows(hours, rushWindows);
+    setRushHoursError(rushError);
+    if (rushError) valid = false;
+
     if (!valid) return;
 
     const workingHours: BranchWorkingHour[] = hours
       .filter((h) => h.enabled)
       .map((h) => ({ dayOfWeek: h.dayOfWeek, startTime: h.startTime, endTime: h.endTime }));
+
+    const rushHours: BranchRushHour[] = rushWindows
+      .map((w) => ({ dayOfWeek: w.dayOfWeek, startTime: w.startTime, endTime: w.endTime }));
 
     const committedTags = tagInput.trim() ? [...tags, tagInput.trim()] : tags;
 
@@ -252,6 +361,10 @@ export default function BranchForm({
       services: builtServices.length > 0 ? builtServices : undefined,
       tags: committedTags.length > 0 ? committedTags : undefined,
       workingHours: workingHours.length > 0 ? workingHours : undefined,
+      // Always sent (even []) — the form is the source of truth for the current rush
+      // window set, same as the arrays above, and this is what guarantees shrunk/cleared
+      // working hours and their now-invalid rush windows are replaced in the same request.
+      rushHours,
     };
 
     const payload: CreateBranchPayload | UpdateBranchPayload =
@@ -423,50 +536,119 @@ export default function BranchForm({
             <i className="bi bi-clock" /> Working Hours
           </h2>
           <p className={styles.sectionDesc}>
-            Enable each day this branch is open and set its operating hours.
+            Enable each day this branch is open and set its operating hours. Optionally mark
+            busy <strong>rush-hour</strong> windows within them — pet owners see a heads-up
+            that waits may run longer, but booking still isn't blocked.
           </p>
         </div>
 
         <div className={styles.hoursTable}>
-          {hours.map((entry) => (
-            <div
-              key={entry.dayOfWeek}
-              className={`${styles.dayRow} ${entry.enabled ? styles.dayRowActive : ''}`}
-            >
-              <label className={styles.dayCheck}>
-                <input
-                  type="checkbox"
-                  checked={entry.enabled}
-                  onChange={() => toggleDay(entry.dayOfWeek)}
-                  disabled={saving || readOnly}
-                />
-                <span className={styles.dayName}>{DAY_NAMES[entry.dayOfWeek]}</span>
-              </label>
+          {hours.map((entry) => {
+            const dayRushWindows = rushWindows.filter((w) => w.dayOfWeek === entry.dayOfWeek);
+            return (
+              <div key={entry.dayOfWeek} className={styles.dayBlock}>
+                <div className={`${styles.dayRow} ${entry.enabled ? styles.dayRowActive : ''}`}>
+                  <label className={styles.dayCheck}>
+                    <input
+                      type="checkbox"
+                      checked={entry.enabled}
+                      onChange={() => toggleDay(entry.dayOfWeek)}
+                      disabled={saving || readOnly}
+                    />
+                    <span className={styles.dayName}>{DAY_NAMES[entry.dayOfWeek]}</span>
+                  </label>
 
-              {entry.enabled ? (
-                <div className={styles.timeInputs}>
-                  <input
-                    type="time"
-                    className={styles.timeInput}
-                    value={entry.startTime}
-                    onChange={(e) => updateHour(entry.dayOfWeek, 'startTime', e.target.value)}
-                    disabled={saving || readOnly}
-                  />
-                  <span className={styles.timeSep}>to</span>
-                  <input
-                    type="time"
-                    className={styles.timeInput}
-                    value={entry.endTime}
-                    onChange={(e) => updateHour(entry.dayOfWeek, 'endTime', e.target.value)}
-                    disabled={saving || readOnly}
-                  />
+                  {entry.enabled ? (
+                    <div className={styles.timeInputs}>
+                      <input
+                        type="time"
+                        className={styles.timeInput}
+                        value={entry.startTime}
+                        onChange={(e) => updateHour(entry.dayOfWeek, 'startTime', e.target.value)}
+                        disabled={saving || readOnly}
+                      />
+                      <span className={styles.timeSep}>to</span>
+                      <input
+                        type="time"
+                        className={styles.timeInput}
+                        value={entry.endTime}
+                        onChange={(e) => updateHour(entry.dayOfWeek, 'endTime', e.target.value)}
+                        disabled={saving || readOnly}
+                      />
+                    </div>
+                  ) : (
+                    <span className={styles.dayClosed}>Closed</span>
+                  )}
                 </div>
-              ) : (
-                <span className={styles.dayClosed}>Closed</span>
-              )}
-            </div>
-          ))}
+
+                {entry.enabled && (
+                  <div className={styles.rushRow}>
+                    <span className={styles.rushLabel}>
+                      <i className="bi bi-lightning-charge-fill" /> Rush hours
+                    </span>
+                    <div className={styles.rushChips}>
+                      {dayRushWindows.map((w) => (
+                        <div key={w.key} className={styles.rushChip}>
+                          <input
+                            type="time"
+                            className={styles.rushTimeInput}
+                            value={w.startTime}
+                            min={entry.startTime}
+                            max={entry.endTime}
+                            onChange={(e) => updateRushWindow(w.key, 'startTime', e.target.value)}
+                            disabled={saving || readOnly}
+                          />
+                          <span className={styles.timeSep}>–</span>
+                          <input
+                            type="time"
+                            className={styles.rushTimeInput}
+                            value={w.endTime}
+                            min={entry.startTime}
+                            max={entry.endTime}
+                            onChange={(e) => updateRushWindow(w.key, 'endTime', e.target.value)}
+                            disabled={saving || readOnly}
+                          />
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              className={styles.rushRemoveBtn}
+                              onClick={() => removeRushWindow(w.key)}
+                              aria-label={`Remove rush window on ${DAY_NAMES[entry.dayOfWeek]}`}
+                              disabled={saving}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {dayRushWindows.length === 0 && (
+                        <span className={styles.dayClosed}>No rush hours</span>
+                      )}
+
+                      {!readOnly && (
+                        <button
+                          type="button"
+                          className={styles.addRushBtn}
+                          onClick={() => addRushWindow(entry.dayOfWeek)}
+                          disabled={saving}
+                        >
+                          <i className="bi bi-plus-lg" /> Add rush window
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+
+        {rushHoursError && (
+          <p className={styles.fieldHint} style={{ color: '#e74c3c' }}>
+            <i className="bi bi-exclamation-circle-fill" /> {rushHoursError}
+          </p>
+        )}
       </div>
 
       {/* ── Tags & Services ── */}

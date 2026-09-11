@@ -224,6 +224,26 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    background: rgba(13, 154, 255, 0.08);
+    border-color: rgba(13, 154, 255, 0.4);
+    color: var(--color-primary, #0d9aff);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(13, 154, 255, 0.15);
+  }
+
+  &:active {
+    transform: translateY(0) scale(0.96);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(13, 154, 255, 0.25);
+  }
 }
 
 .petPillLarge {
@@ -237,12 +257,43 @@
   padding: 0.3rem 0.75rem 0.3rem 0.3rem;
   font-size: 0.8rem;
   font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 
   img {
     width: 24px;
     height: 24px;
     border-radius: 50%;
     object-fit: cover;
+  }
+
+  i {
+    font-size: 0.65rem;
+    color: #9ca3af;
+    transition: transform 0.15s ease, color 0.15s ease;
+  }
+
+  &:hover {
+    background: rgba(13, 154, 255, 0.08);
+    border-color: rgba(13, 154, 255, 0.4);
+    color: var(--color-primary, #0d9aff);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(13, 154, 255, 0.18);
+
+    i {
+      transform: translateX(2px);
+      color: var(--color-primary, #0d9aff);
+    }
+  }
+
+  &:active {
+    transform: translateY(0) scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(13, 154, 255, 0.25);
   }
 }
 

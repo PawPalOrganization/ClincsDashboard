@@ -17,6 +17,7 @@ import type { Column } from '../../components/common/DataTable/DataTable';
 import DataTable from '../../components/common/DataTable/DataTable';
 import Button from '../../components/common/Button/Button';
 import Skeleton from '../../components/common/Skeleton/Skeleton';
+import PetDetailModal from '../Appointments/PetDetailModal';
 import styles from './Patients.module.scss';
 
 type AppRow = Appointment & Record<string, unknown>;
@@ -91,6 +92,8 @@ export default function PatientProfile() {
   const [timelineError, setTimelineError] = useState('');
   const [timelineStatus, setTimelineStatus] = useState<AppointmentStatus | ''>('');
   const [timelineBranchId, setTimelineBranchId] = useState('');
+
+  const [petModalId, setPetModalId] = useState<number | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- !clinicId/!canView already return early in render; !userId alone is unreachable (route-guaranteed by /patients/:userId) but not provably dead code
@@ -231,8 +234,24 @@ export default function PatientProfile() {
     );
   }
 
+  // Best-guess branch context for opening a pet's profile from here (no single
+  // appointment to derive it from) — falls back through the patient's last-visited
+  // branch, then any branch on the clinic. Only matters for creating a vaccination
+  // plan from the modal; viewing/editing existing records doesn't need it.
+  const defaultPetBranchId = profile.stats.visits.lastVisitBranch?.id ?? branches[0]?.id;
+
   return (
     <div className={styles.page}>
+      {petModalId != null && clinicId && (
+        <PetDetailModal
+          petId={petModalId}
+          clinicId={clinicId}
+          branchId={defaultPetBranchId != null ? String(defaultPetBranchId) : undefined}
+          isOpen
+          onClose={() => setPetModalId(null)}
+        />
+      )}
+
       <div className={styles.profileHeader}>
         <Button variant="outline" icon="bi-arrow-left" onClick={() => navigate('/patients')}>Back</Button>
         <div className={styles.profileIdentity}>
@@ -305,10 +324,17 @@ export default function PatientProfile() {
             ) : (
               <div className={styles.petPillList}>
                 {profile.pets.map((pet) => (
-                  <span key={pet.id} className={styles.petPillLarge}>
+                  <button
+                    key={pet.id}
+                    type="button"
+                    className={styles.petPillLarge}
+                    onClick={() => setPetModalId(pet.id)}
+                    title={`View ${pet.name}'s profile`}
+                  >
                     {pet.imageUrl && <img src={pet.imageUrl} alt="" />}
                     {pet.name}
-                  </span>
+                    <i className="bi bi-chevron-right" />
+                  </button>
                 ))}
               </div>
             )}
